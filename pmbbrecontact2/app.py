@@ -196,32 +196,35 @@ def get_location_appointments(location_id):
         connection = get_databricks_connection()
         cursor = connection.cursor()
         where = f" DepartmentEpicId = {location_id}"
-        
-        #query = f"SELECT EMPI, Patient_email, Patient_name, AppointmentConfirmationStatus, AppointmentDate, AppointemntTime FROM biobank_analytics.pmbb_saliva.upcoming_appointments_for_saliva where {where} ORDER BY AppointmentDate"        
 
-        query = f"SELECT  A.EMPI, A.Patient_email, A.Patient_name, A.AppointmentConfirmationStatus, A.AppointmentDate, A.AppointemntTime FROM biobank_analytics.pmbb_saliva.  upcoming_appointments_for_saliva A LEFT JOIN biobank_analytics.pmbb_saliva.scheduled_collection B ON A.EMPI = B.EMPI WHERE A.DepartmentEpicId = {location_id} AND (B.collection_id IS NULL OR B.outcome <> true);"
+        date_from = request.args.get('date_from', '').strip()
+        date_to = request.args.get('date_to', '').strip()
 
-        cursor.execute(query, (location_id))
-                
-        # Fetch all results
+        date_conditions = ""
+        date_params = []
+        if date_from:
+            date_conditions += " AND A.AppointmentDate >= ?"
+            date_params.append(date_from)
+        if date_to:
+            date_conditions += " AND A.AppointmentDate <= ?"
+            date_params.append(date_to)
+
+        query = f"SELECT A.EMPI, A.Patient_email, A.Patient_name, A.AppointmentConfirmationStatus, A.AppointmentDate, A.AppointemntTime FROM biobank_analytics.pmbb_saliva.upcoming_appointments_for_saliva A LEFT JOIN biobank_analytics.pmbb_saliva.scheduled_collection B ON A.EMPI = B.EMPI WHERE A.DepartmentEpicId = {location_id} AND (B.collection_id IS NULL OR B.outcome <> true){date_conditions}"
+        cursor.execute(query, date_params)
         rows = cursor.fetchall()
-        
 
         location_query = f"select * from biobank_analytics.pmbb_saliva.departments where {where} LIMIT 1"
-        # location_query = f"SELECT A.* FROM A LEFT JOIN B ON A.record_id = B.record_id WHERE B.record_id IS NULL;"
         cursor.execute(location_query, (location_id))
         location_information = cursor.fetchall()
 
-
         scheduled_collections_query = f"Select * from biobank_analytics.pmbb_saliva.scheduled_collection where {where}"
-                
-        cursor.execute(scheduled_collections_query,(location_id))  
+        cursor.execute(scheduled_collections_query,(location_id))
         scheduled_collections_rows = cursor.fetchall()
 
         cursor.close()
         connection.close()
 
-        return render_template('location.html', rows=rows,location_info=location_information,loc_id=location_id,scheduled_collections=scheduled_collections_rows )
+        return render_template('location.html', rows=rows, location_info=location_information, loc_id=location_id, scheduled_collections=scheduled_collections_rows, date_from=date_from, date_to=date_to)
     except Exception as e:
         return f"Error: {str(e)}"
     
