@@ -13,7 +13,24 @@
 </style>
 
 <h1>Upcoming Collection Appointments</h1>
-<p>Total Locations: {{ rows|length }}</p>
+<p>Total: {{ rows|length }}</p>
+
+<form method="GET" class="row g-2 align-items-end mb-3">
+    <div class="col-auto">
+        <label for="date_from" class="form-label mb-0">From</label>
+        <input type="date" class="form-control" id="date_from" name="date_from" value="{{ date_from }}">
+    </div>
+    <div class="col-auto">
+        <label for="date_to" class="form-label mb-0">To</label>
+        <input type="date" class="form-control" id="date_to" name="date_to" value="{{ date_to }}">
+    </div>
+    <div class="col-auto">
+        <button type="submit" class="btn btn-primary">Filter</button>
+        {% if date_from or date_to %}
+        <a href="{{ request.path }}" class="btn btn-outline-secondary ms-1">Clear</a>
+        {% endif %}
+    </div>
+</form>
 
 {% if rows %}
 <div class="table-responsive">
