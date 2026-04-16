@@ -580,5 +580,49 @@ def cancel_collection(collection_id):
     except Exception as e:
         return f"Error: {str(e)}"
 
+@app.route('/search', methods=['GET'])
+def search():
+    """Multi-field patient search"""
+    TABLE = "biobank_analytics.pmbb_saliva.upcoming_appointments_for_saliva"
+    COLS = "DISTINCT EMPI, Patient_name, HUP_MRN, Patient_home_phone, Patient_cell_phone"
+
+    name_query  = request.args.get('name_query', '').strip()
+    phone_query = request.args.get('phone_query', '').strip()
+    mrn_query   = request.args.get('mrn_query', '').strip()
+    empi_query  = request.args.get('empi_query', '').strip()
+
+    name_results = phone_results = mrn_results = empi_results = None
+
+    try:
+        connection = get_databricks_connection()
+        cursor = connection.cursor()
+
+        if name_query:
+            cursor.execute(f"SELECT {COLS} FROM {TABLE} WHERE Patient_name LIKE ? LIMIT 100", [f"%{name_query}%"])
+            name_results = cursor.fetchall()
+
+        if phone_query:
+            cursor.execute(f"SELECT {COLS} FROM {TABLE} WHERE Patient_home_phone LIKE ? OR Patient_cell_phone LIKE ? LIMIT 100", [f"%{phone_query}%", f"%{phone_query}%"])
+            phone_results = cursor.fetchall()
+
+        if mrn_query:
+            cursor.execute(f"SELECT {COLS} FROM {TABLE} WHERE HUP_MRN = ? LIMIT 100", [mrn_query])
+            mrn_results = cursor.fetchall()
+
+        if empi_query:
+            cursor.execute(f"SELECT {COLS} FROM {TABLE} WHERE EMPI = ? LIMIT 100", [empi_query])
+            empi_results = cursor.fetchall()
+
+        cursor.close()
+        connection.close()
+    except Exception as e:
+        return f"Error: {str(e)}"
+
+    return render_template('search.html',
+        name_query=name_query,   name_results=name_results,
+        phone_query=phone_query, phone_results=phone_results,
+        mrn_query=mrn_query,     mrn_results=mrn_results,
+        empi_query=empi_query,   empi_results=empi_results)
+
 if __name__ == "__main__":
     app.run(host='0.0.0.0', debug=True)
