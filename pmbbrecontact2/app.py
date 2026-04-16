@@ -598,7 +598,7 @@ def search():
         cursor = connection.cursor()
 
         if name_query:
-            cursor.execute(f"SELECT {COLS} FROM {TABLE} WHERE Patient_name LIKE ? LIMIT 100", [f"%{name_query}%"])
+            cursor.execute(f"SELECT {COLS} FROM {TABLE} WHERE Patient_name ILIKE ? LIMIT 100", [f"%{name_query}%"])
             name_results = cursor.fetchall()
 
         if phone_query:
