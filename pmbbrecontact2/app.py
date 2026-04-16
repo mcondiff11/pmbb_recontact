@@ -571,5 +571,23 @@ def collect_me(collection_id):
         except Exception as e:
                 return f"Error: {str(e)}"
 
+@app.route('/cancel_collection/<collection_id>', methods=['POST'])
+def cancel_collection(collection_id):
+    """Mark a scheduled collection as cancelled / missed (outcome = false)"""
+    try:
+        person_id = request.form['person_id']
+        connection = get_databricks_connection()
+        cursor = connection.cursor()
+        cursor.execute(
+            "UPDATE biobank_analytics.pmbb_saliva.scheduled_collection SET outcome = FALSE WHERE collection_id = ?",
+            [collection_id]
+        )
+        connection.commit()
+        cursor.close()
+        connection.close()
+        return redirect(url_for('person_details', person_id=person_id))
+    except Exception as e:
+        return f"Error: {str(e)}"
+
 if __name__ == "__main__":
     app.run(host='0.0.0.0', debug=True)

@@ -82,10 +82,12 @@
         
       {% else %}
         <td><a class="btn btn-outline-success" href="{{ url_for('collect_me', collection_id=collection_rows['collection_id']) }}"><i class="bi bi-calendar-check"></i> Successful Collection</a></td>
-        <td><a class="btn btn-outline-secondary" href=""><i class="bi bi-calendar-plus"></i> Reschedule</a></td>
-        <td><a class="btn btn-outline-danger" href=""><i class="bi bi-calendar-x"></i> Cancel / Missed</a>
-       
-        {% set ns.scheduled = 1 %}
+        <td>
+          <form method="POST" action="{{ url_for('cancel_collection', collection_id=collection_rows['collection_id']) }}" style="display:inline">
+            <input type="hidden" name="person_id" value="{{ person_id }}">
+            <button type="submit" class="btn btn-outline-danger"><i class="bi bi-calendar-x"></i> Cancel / Missed</button>
+          </form>
+          {% set ns.scheduled = 1 %}
         </td>
         
       {% endif %}
