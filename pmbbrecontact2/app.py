@@ -435,7 +435,7 @@ def upcoming_collections():
             date_conditions += " AND t1.appointment_date <= ?"
             date_params.append(date_to)
 
-        query = f"SELECT t1.*, t2.saliva_kit_id FROM biobank_analytics.pmbb_saliva.scheduled_collection AS t1 LEFT JOIN biobank_analytics.pmbb_saliva.collected_sample AS t2 ON t1.collection_id = t2.collection_id WHERE 1=1{date_conditions} ORDER BY t1.appointment_date, t1.appointment_time"
+        query = f"SELECT t1.*, t2.saliva_kit_id FROM biobank_analytics.pmbb_saliva.scheduled_collection AS t1 LEFT JOIN biobank_analytics.pmbb_saliva.collected_sample AS t2 ON t1.collection_id = t2.collection_id WHERE t1.outcome IS NULL{date_conditions} ORDER BY t1.appointment_date, t1.appointment_time"
         cursor.execute(query, date_params)
 
         rows = cursor.fetchall()
