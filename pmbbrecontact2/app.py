@@ -402,7 +402,7 @@ def completed_collections():
         connection = get_databricks_connection()
         cursor = connection.cursor()
         query = """
-            SELECT cs.collection_id, cs.EMPI, cs.saliva_kit_id, cs.collected_by, cs.location_id, cs.created_date,
+            SELECT cs.collection_id, cs.EMPI, cs.saliva_kit_id, cs.sharpie, cs.collected_by, cs.location_id, cs.created_date,
                    sc.patient_name, sc.location_name
             FROM biobank_analytics.pmbb_saliva.collected_sample cs
             LEFT JOIN biobank_analytics.pmbb_saliva.scheduled_collection sc ON cs.collection_id = sc.collection_id

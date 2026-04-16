@@ -15,6 +15,7 @@
                 <th>Collection ID</th>
                 <th>Patient</th>
                 <th>Saliva Kit ID</th>
+                <th>Sharpie</th>
                 <th>Collected By</th>
                 <th>Location</th>
                 <th>Date Collected</th>
@@ -26,6 +27,7 @@
                 <td>{{ row['collection_id'] }}</td>
                 <td><a href="{{ url_for('person_details', person_id=row['EMPI']) }}">{{ row['patient_name'] or row['EMPI'] }}</a></td>
                 <td>{{ row['saliva_kit_id'] }}</td>
+                <td>{{ row['sharpie'] }}</td>
                 <td>{{ row['collected_by'] }}</td>
                 <td>{{ row['location_name'] }}</td>
                 <td>{{ row['created_date'] }}</td>
