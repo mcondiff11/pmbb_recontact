@@ -14,14 +14,6 @@
         </div>
        
         <div class="mb-3">
-            <label class="form-label">Study</label>
-            <select class="form-control" name="study" required>
-                {% for row in studies %}
-                  <option value="{{row["substudy_id"]}}">{{row["substudy_name"]}}</option>
-                {% endfor %}
-            </select>
-        </div>
-        <div class="mb-3">
           <label class="form-label">Contact Type</label>
           <select class="form-control" name="contact_type" required>
             <option value="2">Phone</option>    

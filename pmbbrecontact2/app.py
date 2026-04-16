@@ -270,14 +270,13 @@ def get_person_contacts(person_id):
             
             notes = request.form['notes']
             contact_type = int(request.form['contact_type'])
-            study = int(request.form['study'])
             current_time_python = datetime.now()
 
             # Parameterized INSERT prevents SQL injection [web:26]
             table_name = "biobank_analytics.pmbb_saliva.recontact"
-            sql_insert = f"INSERT INTO {table_name} (empi_id,contact_type,project,inserted,notes,staff_member) VALUES (?,?,?,?,?,?)"
+            sql_insert = f"INSERT INTO {table_name} (empi_id,contact_type,inserted,notes,staff_member) VALUES (?,?,?,?,?)"
             cursor = connection.cursor()
-            cursor.execute(sql_insert,(person_id,contact_type,study,current_time_python,notes,user_email))
+            cursor.execute(sql_insert,(person_id,contact_type,current_time_python,notes,user_email))
             connection.commit()
             connection.close()
             return redirect(url_for('person_details',person_id=person_id))  # Redirect to success page
@@ -286,17 +285,9 @@ def get_person_contacts(person_id):
     
     if request.method == 'GET':
         try:
-            
-            
-            query = f"select * from biobank_analytics.pmbb_saliva.substudies"              
-            cursor.execute(query)
-            # Fetch all results
-            rows_studies = cursor.fetchall()
             cursor.close()
             connection.close()
-            
-            return render_template('add_contact.html', pid=person_id,studies=rows_studies)
-
+            return render_template('add_contact.html', pid=person_id)
         except Exception as e:
             return f"Error: {str(e)}"
 
