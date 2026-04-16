@@ -1,4 +1,4 @@
-from flask import Flask, render_template_string, render_template, request, url_for,redirect
+from flask import Flask, render_template_string, render_template, request, url_for, redirect, jsonify
 from databricks import sql
 import pandas as pd
 import os
@@ -395,24 +395,56 @@ def schedule_appointment_final(appointment_id):
     except Exception as e:
         return f"Error: {str(e)}"
 
+@app.route('/api/departments')
+def api_departments():
+    """JSON endpoint for department autocomplete"""
+    try:
+        connection = get_databricks_connection()
+        cursor = connection.cursor()
+        cursor.execute("SELECT DepartmentEpicId, DepartmentName FROM biobank_analytics.pmbb_saliva.departments ORDER BY DepartmentName")
+        rows = cursor.fetchall()
+        cursor.close()
+        connection.close()
+        return jsonify([{'id': str(row['DepartmentEpicId']), 'name': row['DepartmentName'], 'epic_id': str(row['DepartmentEpicId'])} for row in rows])
+    except Exception as e:
+        return jsonify([]), 500
+
 @app.route('/completed_collections', methods=['GET'])
 def completed_collections():
     """All collected samples"""
     try:
         connection = get_databricks_connection()
         cursor = connection.cursor()
-        query = """
+
+        date_from = request.args.get('date_from', '').strip()
+        date_to = request.args.get('date_to', '').strip()
+        location_id = request.args.get('location_id', '').strip()
+
+        conditions = ""
+        params = []
+        if location_id:
+            conditions += " AND cs.location_id = ?"
+            params.append(location_id)
+        if date_from:
+            conditions += " AND cs.created_date >= ?"
+            params.append(date_from)
+        if date_to:
+            conditions += " AND cs.created_date <= ?"
+            params.append(date_to)
+
+        query = f"""
             SELECT cs.collection_id, cs.EMPI, cs.saliva_kit_id, cs.sharpie, cs.collected_by, cs.location_id, cs.created_date,
                    sc.patient_name, sc.location_name
             FROM biobank_analytics.pmbb_saliva.collected_sample cs
             LEFT JOIN biobank_analytics.pmbb_saliva.scheduled_collection sc ON cs.collection_id = sc.collection_id
+            WHERE 1=1{conditions}
             ORDER BY cs.created_date DESC
         """
-        cursor.execute(query)
+        cursor.execute(query, params)
         rows = cursor.fetchall()
         cursor.close()
         connection.close()
-        return render_template('completed_collections.html', rows=rows)
+        return render_template('completed_collections.html', rows=rows, date_from=date_from, date_to=date_to, location_id=location_id)
     except Exception as e:
         return f"Error: {str(e)}"
 

@@ -4,8 +4,35 @@
 
 {% block content %}
 
+<link href="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/css/tom-select.bootstrap5.min.css" rel="stylesheet">
+
 <h1>Completed Collections</h1>
 <p>Total: {{ rows|length }}</p>
+
+<div class="row g-2 align-items-end mb-3">
+    <div class="col-md-4">
+        <label class="form-label mb-0">Location</label>
+        <select id="location-select" placeholder="Search by name or ID..."></select>
+    </div>
+</div>
+
+<form method="GET" class="row g-2 align-items-end mb-3">
+    <input type="hidden" name="location_id" value="{{ location_id }}">
+    <div class="col-auto">
+        <label for="date_from" class="form-label mb-0">From</label>
+        <input type="date" class="form-control" id="date_from" name="date_from" value="{{ date_from }}">
+    </div>
+    <div class="col-auto">
+        <label for="date_to" class="form-label mb-0">To</label>
+        <input type="date" class="form-control" id="date_to" name="date_to" value="{{ date_to }}">
+    </div>
+    <div class="col-auto">
+        <button type="submit" class="btn btn-primary">Filter</button>
+        {% if date_from or date_to or location_id %}
+        <a href="{{ request.path }}" class="btn btn-outline-secondary ms-1">Clear</a>
+        {% endif %}
+    </div>
+</form>
 
 {% if rows %}
 <div class="table-responsive">
@@ -40,5 +67,49 @@
 {% else %}
 <p>No completed collections found.</p>
 {% endif %}
+
+<script src="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/js/tom-select.complete.min.js"></script>
+<script>
+    const currentLocationId = "{{ location_id }}";
+    const currentDateFrom = "{{ date_from }}";
+    const currentDateTo = "{{ date_to }}";
+
+    fetch('/api/departments')
+        .then(r => r.json())
+        .then(data => {
+            const ts = new TomSelect('#location-select', {
+                options: data,
+                valueField: 'id',
+                labelField: 'name',
+                searchField: ['name', 'epic_id'],
+                allowEmptyOption: true,
+                placeholder: 'Search by name or ID...',
+                render: {
+                    option: function(item, escape) {
+                        return `<div><span>${escape(item.name)}</span> <small class="text-muted">${escape(item.epic_id)}</small></div>`;
+                    },
+                    item: function(item, escape) {
+                        return `<div>${escape(item.name)} <small class="text-muted">${escape(item.epic_id)}</small></div>`;
+                    }
+                },
+                onChange: function(value) {
+                    const url = new URL(window.location.href);
+                    if (value) {
+                        url.searchParams.set('location_id', value);
+                    } else {
+                        url.searchParams.delete('location_id');
+                    }
+                    // preserve active date filters
+                    if (currentDateFrom) url.searchParams.set('date_from', currentDateFrom);
+                    if (currentDateTo) url.searchParams.set('date_to', currentDateTo);
+                    window.location.href = url.toString();
+                }
+            });
+
+            if (currentLocationId) {
+                ts.setValue(currentLocationId, true);
+            }
+        });
+</script>
 
 {% endblock %}
