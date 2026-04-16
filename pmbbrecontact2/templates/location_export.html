@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+
+{% block title %}Location{% endblock %}
+
+{% block content %}
+
+
+<style>
+.green-checkmark {
+  color: green; /* Sets the color to green */
+  font-size: 20px; /* Optional: Adjusts the size */
+  font-weight: bold; /* Optional: Makes it bolder */
+}
+.row-container {
+    display: inline-flex; /* Shrinks container to fit content */
+    
+    gap: 20px;
+    padding: 10px;
+  }
+  .column {
+    /* Optional: styling for columns */
+  }
+</style>
+
+
+{% if location_info %}
+    {% for location_row in location_info %}
+    <h1 class="py-2"><svg xmlns="http://www.w3.org/2000/svg" width="50" height="50" fill="currentColor" class="bi bi-geo-alt-fill" viewBox="0 0 16 16">
+        <path d="M8 16s6-5.686 6-10A6 6 0 0 0 2 6c0 4.314 6 10 6 10m0-7a3 3 0 1 1 0-6 3 3 0 0 1 0 6"/>
+        </svg> {{location_row[3]}}</h1>
+    <div class="row py-3 shadow justify-content-evenly mb-4" style="background-color: rgba(0, 0, 0, 0.03);">
+    <div class="row mb-3"><div class="col-lg-12"><strong>Department: {{location_row[1]}} | {{location_row[6]}} </strong></div></div>
+    <div class="row mb-3">
+        <div class="col-lg-2"><strong>Location Address:</strong></div>
+        <div class="col-lg-10">{{location_row[7]}} <br> {{location_row[8]}}, {{location_row[9]}} {{location_row[10]}}</div>
+    </div>
+    
+    <div class="row mb-3">
+        <div class="col-lg-2"><strong>Location Parent:</strong></div>
+        <div class="col-lg-10"> {{location_row[5]}} {{location_row[4]}}</div>
+    </div>
+    <div class="row mb-3">
+        <div class="col-lg-2"><strong>Department Type:</strong></div> 
+        <div class="col-lg-10">{{location_row[11]}}</div>
+    </div>
+    {% if location_row[12] == 1 %}
+       <div class="row mb-3"><div class="col-lg-12"> <strong>Preferred Location</strong> <span class="green-checkmark">&#10004;</span></div></div>
+    {% endif %}
+    </div>
+    {% endfor %}
+{% else %}
+
+{% endif %}
+
+
+
+<p class="text-center">Total appointments for this location: <strong>{{ rows|length }}</strong></p>
+
+{% if rows %}
+<div class="table-responsive">
+            <table class="table table-striped table-bordered table-hover">
+                <thead class="table-dark">
+                    <tr>
+                        <th scope="col">EMPI</th>
+                        <th scope="col">Patient</th>
+                        <th scope="col">Name</th>
+                        <th scope="col">Date/Time</th>
+                        <th scope="col">Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                   {% for row in rows %}
+                    <tr>
+                         <td>{{row['EMPI'] }}</td>
+                        <td>{{row['Patient_name'] }}</td>
+                        <td>{{ row['Patient_email'] }}</td>
+                        
+                        <td>{{ row['AppointmentDate'] }}</td>
+                        <td>{{row['AppointmentConfirmationStatus']}}</td>
+                        
+                    </tr>
+                   {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+{% else %}
+<p>No records</p>
+{% endif %}
+{% endblock %}

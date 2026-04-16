@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+
+{% block title %}Add Contact{% endblock %}
+
+{% block content %}
+
+
+<h1>Add Contact for Person ID: {{ pid }}</h1>
+
+<form method="POST" action="/contact/{{ pid }}">
+        <div class="mb-3">
+            <label class="form-label">Person ID</label>
+            <input type="text" class="form-control" name="empi" value="{{pid}}" readonly  required>
+        </div>
+       
+        <div class="mb-3">
+            <label class="form-label">Study</label>
+            <select class="form-control" name="study" required>
+                {% for row in studies %}
+                  <option value="{{row["substudy_id"]}}">{{row["substudy_name"]}}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Contact Type</label>
+          <select class="form-control" name="contact_type" required>
+            <option value="2">Phone</option>    
+            <option value="1">E-Mail</option>
+            <option value="3">Other</option>
+          </select>
+        </div>
+        <div class="mb-3">
+          <textarea class="form-control" name="notes"></textarea>
+          <label for="floatingTextarea">Comments</label>
+        </div>
+
+
+        <button type="submit" class="btn btn-primary">Add Record</button>
+        <a href="/" class="btn btn-secondary">Cancel</a>
+    </form>
+
+{% endblock %}

@@ -1,0 +1,7 @@
+flask
+gunicorn
+plotly
+pandas
+sqlalchemy
+databricks-sql-connector
+python-dotenv

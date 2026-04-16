@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+
+{% block title %}All Studies{% endblock %}
+
+{% block content %}
+<h1>Studies</h1>
+<p>Total records shown: {{ rows|length }}</p>
+
+{% if rows %}
+<div class="table-responsive">
+            <table class="table table-striped table-bordered table-hover">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Study ID</th>
+                        <th>Study Name</th>
+                        
+                    </tr>
+                </thead>
+                <tbody>
+                   {% for row in rows %}
+                    <tr>
+                        <td>{{ row[0] }}</td>
+                        <td><a href="{{ url_for('get_study', study_id=row[0]) }}" class="person-link">{{ row[1] }}</a></td>
+                       
+                    </tr>
+                   {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+
+
+{% else %}
+<p>No records</p>
+{% endif %}
+{% endblock %}

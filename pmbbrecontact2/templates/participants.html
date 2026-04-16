@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+
+{% block title %}Participants{% endblock %}
+
+{% block content %}
+
+<div class="border p-3">
+
+  <form class="row g-3" action="/participants" method="get">
+    <!-- EMPI ID -->
+    <div class="col-lg-4 ">
+      <label for="EMPI" class="form-label">Person ID</label>
+      <input
+        type="text"
+        class="form-control"
+        
+        name="empi"
+        
+      >
+    </div>
+
+    <!--  Name -->
+    <div class="col-lg-4">
+      <label for="person_name" class="form-label">Person Name</label>
+      <input
+        type="text"
+        class="form-control"
+        
+        name="patient_name"
+        placeholder="e.g.  Doe, Jane"
+      >
+    </div>
+
+    <!-- HUP MRN -->
+    <div class="col-lg-4">
+      <label for="person_name" class="form-label">HUP MRN</label>
+      <input
+        type="text"
+        class="form-control"
+        id="person_name"
+        name="hup_mrn"
+        
+      >
+    </div>
+
+    <!-- Submit -->
+    <div class="col-12">
+      <button type="submit" class="btn btn-primary">
+        Search
+      </button>
+    </div>
+  </form>
+</div>
+
+
+</div>
+
+{% if rows %}
+<div class="table-responsive">
+    <table id="participants-table" class="table table-striped table-bordered table-hover">
+        <thead>
+            <tr>
+                
+                
+                <th>Patient</th>
+                <th>Date/Time</th>
+                <th>Status</th>
+                <th>Location</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in rows %}
+            <tr>
+                <td><a href="{{ url_for('person_details', person_id=row['EMPI']) }}" class="person-link">{{ row['Patient_name'] }}</a></td>
+                <td>{{ row['EMPI'] }}</td>
+                <td>{{ row['HUP_MRN'] }}</td>
+                <td><a href="{{ url_for('get_location_appointments', location_id=row[4]) }}" class="location-link">{{ row[5] }}</a></td>
+                
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<p>No reords found.</p>
+{% endif %}
+
+
+{% endblock %}

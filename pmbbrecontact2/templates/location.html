@@ -1,0 +1,137 @@
+{% extends "base.html" %}
+
+{% block title %}Location{% endblock %}
+
+{% block content %}
+
+
+<style>
+.green-checkmark {
+  color: green; /* Sets the color to green */
+  font-size: 20px; /* Optional: Adjusts the size */
+  font-weight: bold; /* Optional: Makes it bolder */
+}
+.row-container {
+    display: inline-flex; /* Shrinks container to fit content */
+    
+    gap: 20px;
+    padding: 10px;
+  }
+  .column {
+    /* Optional: styling for columns */
+  }
+</style>
+
+
+{% if location_info %}
+    {% for location_row in location_info %}
+    <h1 class="py-2"><i class="bi bi-geo-alt-fill"></i> {{location_row[3]}}</h1>
+    <div class="row py-3 shadow justify-content-evenly mb-4" style="background-color: rgba(0, 0, 0, 0.03);">
+    <div class="row mb-3"><div class="col-lg-12"><strong>Department: {{location_row[1]}} | {{location_row[6]}} </strong></div></div>
+    <div class="row mb-3">
+        <div class="col-lg-2"><strong>Location Address:</strong></div>
+        <div class="col-lg-10">{{location_row[7]}} <br> {{location_row[8]}}, {{location_row[9]}} {{location_row[10]}}</div>
+    </div>
+    
+    <div class="row mb-3">
+        <div class="col-lg-2"><strong>Location Parent:</strong></div>
+        <div class="col-lg-10"> {{location_row[5]}} {{location_row[4]}}</div>
+    </div>
+    <div class="row mb-3">
+        <div class="col-lg-2"><strong>Department Type:</strong></div> 
+        <div class="col-lg-10">{{location_row[11]}}</div>
+    </div>
+    {% if location_row[12] == 1 %}
+       <div class="row mb-3"><div class="col-lg-12"> <strong>Preferred Location</strong> <span class="green-checkmark">&#10004;</span></div></div>
+    {% endif %}
+    </div>
+    {% endfor %}
+{% else %}
+
+{% endif %}
+
+
+
+<p class="text-center">Total appointments for this location: <strong>{{ rows|length }}</strong> | <a href="{{ url_for('get_location_appointments_export', location_id=loc_id) }}">Export For Email</a></p>
+
+<ul class="nav nav-tabs" id="myTab" role="tablist">
+  <li class="nav-item" role="presentation">
+    <button class="nav-link active" id="home-tab" data-bs-toggle="tab" data-bs-target="#home-tab-pane" type="button" role="tab" aria-controls="home-tab-pane" aria-selected="true">All Appointments</button>
+  </li>
+  <li class="nav-item" role="presentation">
+    <button class="nav-link" id="profile-tab" data-bs-toggle="tab" data-bs-target="#profile-tab-pane" type="button" role="tab" aria-controls="profile-tab-pane" aria-selected="false">Scheduled Collections</button>
+  </li>
+  
+</ul>
+<div class="tab-content" id="myTabContent">
+    <div class="tab-pane fade show active" id="home-tab-pane" role="tabpanel" aria-labelledby="home-tab" tabindex="0">
+{% if rows %}
+<div class="table-responsive">
+            <table class="table table-striped table-bordered table-hover">
+                <thead class="table-dark">
+                    <tr>
+                        <th scope="col">Patient</th>
+                        <th scope="col">Date</th>
+                        <th scope="col">Time</th>
+                        <th scope="col">Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                   {% for row in rows %}
+                    <tr>
+                        <td><a href="{{ url_for('person_details', person_id=row[0]) }}" class="person-link">{{ row['Patient_name'] }}</a></td>
+                        <td>{{ row['AppointmentDate'] }}</td>
+                        <td>{{row['AppointemntTime']}}</td>
+                        <td>{{row['AppointmentConfirmationStatus']}}</td>
+                    </tr>
+                   {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+{% else %}
+    
+    <p>No records</p>
+{% endif %}
+    </div>
+    <div class="tab-pane fade" id="profile-tab-pane" role="tabpanel" aria-labelledby="profile-tab" tabindex="0">
+        {% if scheduled_collections %}
+            <table class="table table-striped table-bordered table-hover">
+                <thead class="table-dark">
+                    <tr>
+                        <th scope="col">Patient</th>
+                        <th scope="col">Date</th>
+                        <th scope="col">Time</th>
+                        <th scope="col">Appointment ID</th>
+                        <th scope="col">Outcome</th>
+                    </tr>
+                </thead>
+                <tbody>
+                   {% for collection_row in scheduled_collections %}
+                    <tr>
+                        <td><a href="{{ url_for('person_details', person_id=collection_row['EMPI']) }}" class="person-link">{{ collection_row['patient_name'] }}</a></td>
+                        <td>{{ collection_row['appointment_date'] }}</td>
+                        <td>{{ collection_row['appointment_time'] }}</td>
+                        <td>{{ collection_row['appointment_id']}}</td>
+                        <td>
+                        {% if collection_row['outcome'] == true %}
+                            <i style="color:green" class="bi bi-check-lg"></i>
+                        {% elif collection_row['outcome'] == false %}
+                            <i style="color: red" class="bi bi-x-lg"></i>
+                        {% else %}
+                            &nbsp;
+                        {% endif %}    
+                        </td>
+                        
+                    </tr>
+                   {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <p>No records</p>
+        {% endif %}
+    </div>
+
+</div>
+
+{% endblock %}

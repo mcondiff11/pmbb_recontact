@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+
+{% block title %}Study{% endblock %}
+
+{% block content %}
+
+
+<h1 class="my-3">Participants for Study ID: 
+{% if sid == "837" %}
+ppcm
+{% elif sid == "456" %}
+endometriosis
+{% elif sid == "78" %}
+breast imaging
+{% elif sid == "462" %}
+atopic dermatitis
+{% else %}
+{{ sid }}
+{% endif %}
+</h1>
+
+
+
+{% if rows %}
+<div class="table-responsive">
+            <table class="table table-striped table-bordered table-hover">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Patient</th>
+                        
+                        <th>Date/Time</th>
+                        <th>Status</th>
+                        <th>Location</th>
+                        
+                    </tr>
+                </thead>
+                <tbody>
+                   {% for row in rows %}
+                    <tr>
+                        
+                       <td><a href="{{ url_for('person_details', person_id=row[0]) }}" class="person-link">{{ row[1] }}</a></td>
+                <td>{{ row[2] }}</td>
+                <td>{{ row[3] }}</td>
+                <td><a href="{{ url_for('get_location_appointments', location_id=row[4]) }}" class="location-link">{{ row[5] }}</a></td>
+                
+            </tr>
+                    </tr>
+                   {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+{% else %}
+<p>No records</p>
+{% endif %}
+{% endblock %}

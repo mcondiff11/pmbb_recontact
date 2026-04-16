@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+
+{% block title %}Locations{% endblock %}
+
+{% block content %}
+<a href="{{ url_for('index') }}" class="back-link">← Back to All Records</a>
+
+<style>
+.green-checkmark {
+  color: green; /* Sets the color to green */
+  font-size: 20px; /* Optional: Adjusts the size */
+  font-weight: bold; /* Optional: Makes it bolder */
+}
+</style>
+
+<h1>Appointment Locations</h1>
+<p>Total Locations: {{ rows|length }}</p>
+
+{% if rows %}
+<div class="table-responsive">
+            <table id="locations-table" class="table table-striped table-bordered table-hover">
+                <thead class="table-dark">
+                    <tr>
+                        <th>DepartmentEpicId</th>
+                        <th>Location </th>
+                        <th>Description</th>
+                        <th>Parent</th>
+                        <th>Zip</th>
+                        <th>Preferred Location</th>
+                    </tr>
+                </thead>
+                <tbody>
+                   {% for row in rows %}
+                    <tr>
+                        <td>{{row['DepartmentEpicId']}}</td>
+                        <td><a href="{{ url_for('get_location_appointments', location_id=row[0]) }}" class="person-link">{{ row[1] }}</a></td>
+                       
+                        
+                        <td>{{ row[2] }}</td>
+                        <td>{{ row[3] }}</td>
+                        <td>{{ row[4] }}</td>
+                       
+                        <td>
+                            
+                            {% if row[5] == 1 %}
+                            <span class="green-checkmark">&#10004;</span>
+                           
+                            {% else %}
+                                &nbsp;
+                            {% endif %}
+                           
+
+
+
+                        </td>
+                    </tr>
+                   {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+{% else %}
+<p>No records</p>
+{% endif %}
+
+<script   src="https://code.jquery.com/jquery-3.4.1.min.js" integrity="sha256-CSXorXvZcTkaix6Yvo6HppcZGetbYMGWSFlBw8HfCJo=" crossorigin="anonymous"></script>
+<script type="text/javascript" src="https://cdn.datatables.net/2.0.1/js/dataTables.js"></script>
+<script type="text/javascript" src="https://cdn.datatables.net/2.0.1/js/dataTables.bootstrap5.js"></script>
+<script>
+$(function(){
+    $("#locations-table").dataTable({
+    	"lengthMenu": [ 25, 50, 100 ],
+    	"pageLength":25,
+        order: [[5, 'desc']]
+    });
+})
+</script>
+
+{% endblock %}

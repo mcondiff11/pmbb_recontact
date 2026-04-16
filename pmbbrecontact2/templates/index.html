@@ -1,0 +1,138 @@
+{% extends "base.html" %}
+
+{% block title %}All Records{% endblock %}
+
+{% block content %}
+<h1>Appointments</h1>
+<p>Total records shown: {{ rows|length }}</p>
+
+<!-- Filter Form -->
+                        <form action="/" method="GET" style="margin-bottom: 20px; padding: 15px; background-color: #f8f9fa; border-radius: 5px;">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" role="switch" name="status_filter" 
+                                        value="1" 
+                                        {{ "checked" if confirmed_appointments else "" }}
+                                        onchange="this.form.submit()">
+                                <label class="form-check-label" for="switchCheckDefault">Show Confirmed Appointments Only</label>
+                            </div>
+                            <noscript>
+                                    <input type="submit" value="Apply Filter" style="padding: 5px 10px;">
+                            </noscript>
+                            <div class="row justify-content-center">
+                                <div class="col-lg-3 col-sm-6">
+                                    <label for="startDate">Start</label>
+                                    <input id="startDate" class="form-control" type="date" />
+                                    <span id="startDateSelected"></span>
+                                </div>
+                                <div class="col-lg-3 col-sm-6">
+                                    <label for="endDate">End</label>
+                                    <input id="endDate" class="form-control" type="date" />
+                                    <span id="endDateSelected"></span>
+                                </div>
+                            </div>
+                            
+                        </form>
+
+<div class="alert alert-warning" role="alert"><p>This is all appointments available. It is NOT to be used for anything but reference.  </p>
+<p>It is not filtered for Do Not Call, Remove from PMBB, Sample Collected, Sample Collection Scheduled</p>
+</div>
+
+
+
+{% if rows %}
+<div class="table-responsive">
+    <table class="table table-striped table-bordered table-hover">
+        <thead>
+            <tr>
+                
+                
+                <th>Patient</th>
+                <th>Date/Time</th>
+                <th>Status</th>
+                <th>Location</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in rows %}
+            <tr>
+                <td><a href="{{ url_for('person_details', person_id=row[0]) }}" class="person-link">{{ row[1] }}</a></td>
+                <td>{{ row[2] }}</td>
+                <td>{{ row[3] }}</td>
+                <td><a href="{{ url_for('get_location_appointments', location_id=row[4]) }}" class="location-link">{{ row[5] }}</a></td>
+                
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<!-- Pagination Controls -->
+                       
+<nav aria-label="Page navigation">
+    <ul class="pagination justify-content-center">
+        <!-- Previous Button -->
+        {% if current_page > 1 %}
+            <li class="page-item">
+                <a class="page-link" href="?page={{ current_page - 1 }}{{pagination_vars}}">Previous</a>
+            </li>
+        {% else %}
+            <li class="page-item disabled">
+                <span class="page-link">Previous</span>
+            </li>
+        {% endif %}
+                                
+        <!-- First Page -->
+        {% if start_page > 1 %}
+            <li class="page-item">
+                <a class="page-link" href="?page=1{{pagination_vars}}">1</a>
+            </li>
+            {% if start_page > 2 %}
+                <li class="page-item disabled">
+                    <span class="page-link">...</span>
+                </li>
+            {% endif %}
+        {% endif %}
+                                
+        <!-- Page Numbers -->
+        {% for page_num in page_range %}
+        {% if page_num == current_page %}
+            <li class="page-item active">
+             <span class="page-link">{{ page_num }}</span>
+            </li>
+        {% else %}
+            <li class="page-item">
+                <a class="page-link" href="?page={{ page_num }}{{pagination_vars}}">{{ page_num }}</a>
+            </li>
+        {% endif %}
+        {% endfor %}
+                                
+        <!-- Last Page -->
+        {% if end_page <= total_pages %}
+        {% if end_page < total_pages %}
+            <li class="page-item disabled">
+                <span class="page-link">...</span>
+            </li>
+        {% endif %}
+            <li class="page-item">
+                <a class="page-link" href="?page={{ total_pages }}{{pagination_vars}}">{{ total_pages }}</a>
+            </li>
+        {% endif %}
+                                
+        <!-- Next Button -->
+        {% if current_page < total_pages %}
+            <li class="page-item">
+                <a class="page-link" href="?page={{ current_page + 1 }}{{pagination_vars}}">Next</a>
+            </li>
+        {% else %}
+            <li class="page-item disabled">
+                <span class="page-link">Next</span>
+            </li>
+        {% endif %}
+    </ul>
+</nav>
+
+
+{% else %}
+<p>No reords found.</p>
+{% endif %}
+{% endblock %}

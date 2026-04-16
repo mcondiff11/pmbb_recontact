@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+
+{% block title %}Sample Collection Event {% endblock %}
+
+{% block content %}
+
+<h1 class="py-2"><i class="bi bi-calendar-check"></i> Successful Collection Event</h1>
+
+{% if rows %}
+<div class="table-responsive">
+            <table class="table table-striped table-bordered table-hover">
+                <thead class="table-dark">
+                    <tr>
+                        <th scope="col">Patient</th>
+                        <th scope="col">EMPI</th>
+                        <th scope="col">Appointment ID</th>
+                        <th scope="col">Date</th>
+                        <th scope="col">Time</th>
+                        <th scope="col">Location</th>
+                    </tr>
+                </thead>
+                <tbody>
+                   {% for row in rows %}
+                    <tr>
+                        <td><a href="{{ url_for('person_details', person_id=row[0]) }}" class="person-link">{{ row['patient_name'] }}</a></td>
+                        <td>{{row['EMPI']}}</td>
+                        <td>{{row['appointment_id']}}</td>
+                        <td>{{ row['appointment_date'] }}</td>
+                        <td>{{row['appointment_time']}}</td>
+                        <td>{{row['location_name']}}</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <form method="POST" action="/collect_me/{{ cid }}">
+        <div class="mb-3">
+            <label class="form-label">Collection Identifier</label>
+            <input type="text" class="form-control" name="collection_id" value="{{cid}}" readonly  required>
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">Saliva Tube Kit ID <i class="bi bi-upc-scan"></i></label>
+            <input type="text" class="form-control" name="saliva_tube_kit_id" value=""  required>
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">Location ID <i class="bi bi-hospital"></i></label>
+            <input type="text" class="form-control" name="location_id" value="{{row['DepartmentEpicId']}}" readonly required>
+        </div>
+        <div class="mb-3">
+            <label class="form-label">EMPI <i class="bi bi-person-circle"></i></label>
+            <input type="text" class="form-control" name="empi" value="{{row['EMPI']}}" readonly required>
+        </div>
+      
+        <button type="submit" class="btn btn-primary">Add Sample Collected</button>
+        <a href="/person/{{row['EMPI']}}" class="btn btn-secondary">Cancel</a>
+    </form>
+                    
+
+                   {% endfor %}
+                
+
+{% else %}
+  <p>No records</p>
+{% endif %}
+
+
+
+{% endblock %}
