@@ -33,15 +33,23 @@
             </table>
         </div>
 
-        <form method="POST" action="/collect_me/{{ cid }}">
+        <form method="POST" action="/collect_me/{{ cid }}" id="collect-form">
+
+        <div id="validation-alert" class="alert alert-warning d-none" role="alert"></div>
+
         <div class="mb-3">
             <label class="form-label">Collection Identifier</label>
-            <input type="text" class="form-control" name="collection_id" value="{{cid}}" readonly  required>
+            <input type="text" class="form-control" name="collection_id" value="{{cid}}" readonly required>
         </div>
 
         <div class="mb-3">
             <label class="form-label">Saliva Tube Kit ID <i class="bi bi-upc-scan"></i></label>
-            <input type="text" class="form-control" name="saliva_tube_kit_id" value=""  required>
+            <input type="number" step="1" class="form-control" name="saliva_tube_kit_id" value="" placeholder="Enter kit ID">
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">Sharpie <i class="bi bi-pencil-fill"></i></label>
+            <input type="number" step="1" class="form-control" name="sharpie" value="" placeholder="Enter sharpie number">
         </div>
 
         <div class="mb-3">
@@ -52,10 +60,33 @@
             <label class="form-label">EMPI <i class="bi bi-person-circle"></i></label>
             <input type="text" class="form-control" name="empi" value="{{row['EMPI']}}" readonly required>
         </div>
-      
+
         <button type="submit" class="btn btn-primary">Add Sample Collected</button>
         <a href="/person/{{row['EMPI']}}" class="btn btn-secondary">Cancel</a>
     </form>
+
+    <script>
+        document.getElementById('collect-form').addEventListener('submit', function(e) {
+            const kitVal = document.querySelector('[name="saliva_tube_kit_id"]').value.trim();
+            const sharpieVal = document.querySelector('[name="sharpie"]').value.trim();
+            const alertBox = document.getElementById('validation-alert');
+            const messages = [];
+
+            const isValidInt = (val) => val !== '' && /^-?\d+$/.test(val);
+
+            if (!isValidInt(kitVal)) messages.push('Saliva Tube Kit ID is required and must be a whole number.');
+            if (!isValidInt(sharpieVal)) messages.push('Sharpie number is required and must be a whole number.');
+
+            if (messages.length > 0) {
+                e.preventDefault();
+                alertBox.innerHTML = messages.join('<br>');
+                alertBox.classList.remove('d-none');
+                alertBox.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            } else {
+                alertBox.classList.add('d-none');
+            }
+        });
+    </script>
                     
 
                    {% endfor %}

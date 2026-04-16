@@ -516,18 +516,18 @@ def collect_me(collection_id):
         try:
             user_email = get_current_databricks_user_email()
             coll_id = int(request.form['collection_id'])
-            
             saliva_tube_kit_id = int(request.form['saliva_tube_kit_id'])
+            sharpie = int(request.form['sharpie'])
             location_id = int(request.form['location_id'])
             empi = request.form['empi']
-            
+
             current_time_python = datetime.now()
 
             # Parameterized INSERT prevents SQL injection [web:26]
             table_name = "biobank_analytics.pmbb_saliva.collected_sample"
-            sql_insert = f"INSERT INTO {table_name} (collection_id,EMPI,saliva_kit_id,collected_by,location_id,created_date) VALUES (?,?,?,?,?,?);"
+            sql_insert = f"INSERT INTO {table_name} (collection_id,EMPI,saliva_kit_id,collected_by,location_id,created_date,sharpie) VALUES (?,?,?,?,?,?,?);"
             cursor = connection.cursor()
-            cursor.execute(sql_insert,(coll_id,empi,saliva_tube_kit_id,user_email,location_id,current_time_python))
+            cursor.execute(sql_insert,(coll_id,empi,saliva_tube_kit_id,user_email,location_id,current_time_python,sharpie))
             connection.commit()
 
             update_table = "biobank_analytics.pmbb_saliva.scheduled_collection"
