@@ -64,6 +64,8 @@
                         <th scope="col">EMPI</th>
                         <th scope="col">Patient</th>
                         <th scope="col">Name</th>
+                        <th scope="col">Cell Phone</th>
+                        <th scope="col">Home Phone</th>
                         <th scope="col">Date/Time</th>
                         <th scope="col">Status</th>
                     </tr>
@@ -74,7 +76,8 @@
                          <td>{{row['EMPI'] }}</td>
                         <td>{{row['Patient_name'] }}</td>
                         <td>{{ row['Patient_email'] }}</td>
-                        
+                        <td>{{ row['Patient_cell_phone'] }}</td>
+                        <td>{{ row['Patient_home_phone'] }}</td>
                         <td>{{ row['AppointmentDate'] }}</td>
                         <td>{{row['AppointmentConfirmationStatus']}}</td>
                         

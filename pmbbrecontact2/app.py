@@ -236,7 +236,7 @@ def get_location_appointments_export(location_id):
         cursor = connection.cursor()
         where = f" DepartmentEpicId = {location_id}"
 
-        query = f"SELECT  A.EMPI, A.Patient_email, A.Patient_name, A.AppointmentConfirmationStatus, A.AppointmentDate, A.AppointemntTime FROM biobank_analytics.pmbb_saliva.  upcoming_appointments_for_saliva A LEFT JOIN biobank_analytics.pmbb_saliva.scheduled_collection B ON A.EMPI = B.EMPI WHERE A.DepartmentEpicId = {location_id} AND (B.collection_id IS NULL OR B.outcome <> true);"           
+        query = f"SELECT  A.EMPI, A.Patient_email, A.Patient_name, A.Patient_cell_phone, A.Patient_home_phone, A.AppointmentConfirmationStatus, A.AppointmentDate, A.AppointemntTime FROM biobank_analytics.pmbb_saliva.  upcoming_appointments_for_saliva A LEFT JOIN biobank_analytics.pmbb_saliva.scheduled_collection B ON A.EMPI = B.EMPI WHERE A.DepartmentEpicId = {location_id} AND (B.collection_id IS NULL OR B.outcome <> true);"
         cursor.execute(query, (location_id))
                 
         # Fetch all results
