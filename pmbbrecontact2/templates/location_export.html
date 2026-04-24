@@ -54,6 +54,21 @@
 
 
 
+<form method="GET" class="row g-2 align-items-end mb-3">
+    <div class="col-auto">
+        <label class="form-label">From</label>
+        <input type="date" name="date_from" class="form-control" value="{{ date_from }}">
+    </div>
+    <div class="col-auto">
+        <label class="form-label">To</label>
+        <input type="date" name="date_to" class="form-control" value="{{ date_to }}">
+    </div>
+    <div class="col-auto">
+        <button type="submit" class="btn btn-primary">Filter</button>
+        <a href="{{ request.path }}" class="btn btn-secondary ms-1">Clear</a>
+    </div>
+</form>
+
 <p class="text-center">Total appointments for this location: <strong>{{ rows|length }}</strong></p>
 
 {% if rows %}

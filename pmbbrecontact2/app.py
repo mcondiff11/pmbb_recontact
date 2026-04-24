@@ -236,12 +236,21 @@ def get_location_appointments_export(location_id):
         cursor = connection.cursor()
         where = f" DepartmentEpicId = {location_id}"
 
-        query = f"SELECT  A.EMPI, A.Patient_email, A.Patient_name, A.Patient_cell_phone, A.Patient_home_phone, A.AppointmentConfirmationStatus, A.AppointmentDate, A.AppointemntTime FROM biobank_analytics.pmbb_saliva.  upcoming_appointments_for_saliva A LEFT JOIN biobank_analytics.pmbb_saliva.scheduled_collection B ON A.EMPI = B.EMPI WHERE A.DepartmentEpicId = {location_id} AND (B.collection_id IS NULL OR B.outcome <> true);"
-        cursor.execute(query, (location_id))
-                
-        # Fetch all results
+        date_from = request.args.get('date_from', '').strip()
+        date_to = request.args.get('date_to', '').strip()
+
+        date_conditions = ""
+        date_params = []
+        if date_from:
+            date_conditions += " AND A.AppointmentDate >= ?"
+            date_params.append(date_from)
+        if date_to:
+            date_conditions += " AND A.AppointmentDate <= ?"
+            date_params.append(date_to)
+
+        query = f"SELECT A.EMPI, A.Patient_email, A.Patient_name, A.Patient_cell_phone, A.Patient_home_phone, A.AppointmentConfirmationStatus, A.AppointmentDate, A.AppointemntTime FROM biobank_analytics.pmbb_saliva.upcoming_appointments_for_saliva A LEFT JOIN biobank_analytics.pmbb_saliva.scheduled_collection B ON A.EMPI = B.EMPI WHERE A.DepartmentEpicId = {location_id} AND (B.collection_id IS NULL OR B.outcome <> true){date_conditions}"
+        cursor.execute(query, date_params)
         rows = cursor.fetchall()
-        
 
         location_query = f"select * from biobank_analytics.pmbb_saliva.departments where {where} LIMIT 1"
         cursor.execute(location_query, (location_id))
@@ -250,7 +259,7 @@ def get_location_appointments_export(location_id):
         cursor.close()
         connection.close()
 
-        return render_template('location_export.html', rows=rows,location_info=location_information)
+        return render_template('location_export.html', rows=rows, location_info=location_information, date_from=date_from, date_to=date_to)
     except Exception as e:
         return f"Error: {str(e)}"
     
