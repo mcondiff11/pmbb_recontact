@@ -160,12 +160,17 @@ def person_details(person_id):
         cursor.execute(scheduled_collection_query, (person_id))
         scheduled_collection_rows = cursor.fetchall()
 
+        collected_sample_query = f"SELECT cs.*, sc.location_name FROM biobank_analytics.pmbb_saliva.collected_sample cs LEFT JOIN biobank_analytics.pmbb_saliva.scheduled_collection sc ON cs.collection_id = sc.collection_id WHERE cs.EMPI = {person_id} LIMIT 1"
+        cursor.execute(collected_sample_query, (person_id))
+        successful_collection = cursor.fetchone()
+
         cursor.close()
         connection.close()
 
-        return render_template('person.html', rows=rows,columns=columns,
+        return render_template('person.html', rows=rows, columns=columns,
                 confirmed_appointments=confirmed_appointments,
-                person_id=person_id, substudies=substudy_rows, contacts=contact_rows, collections=scheduled_collection_rows) 
+                person_id=person_id, substudies=substudy_rows, contacts=contact_rows,
+                collections=scheduled_collection_rows, successful_collection=successful_collection) 
     except Exception as e:
             return f"Error: {str(e)}"
 
@@ -565,6 +570,7 @@ def collect_me(collection_id):
             update_table = "biobank_analytics.pmbb_saliva.scheduled_collection"
             update_collection_event = f"UPDATE {update_table} SET outcome = TRUE WHERE collection_id = ?;"
             cursor.execute(update_collection_event,(collection_id))
+            connection.commit()
 
             connection.close()
             return redirect(url_for('person_details',person_id=empi))  # Redirect to success page
