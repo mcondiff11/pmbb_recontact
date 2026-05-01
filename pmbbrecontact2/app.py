@@ -472,7 +472,7 @@ def upcoming_collections():
             date_conditions += " AND t1.appointment_date <= ?"
             date_params.append(date_to)
 
-        query = f"SELECT t1.*, t2.saliva_kit_id FROM biobank_analytics.pmbb_saliva.scheduled_collection AS t1 LEFT JOIN biobank_analytics.pmbb_saliva.collected_sample AS t2 ON t1.collection_id = t2.collection_id WHERE t1.outcome IS NULL{date_conditions} ORDER BY t1.appointment_date, t1.appointment_time"
+        query = f"SELECT t1.*, t2.saliva_kit_id FROM biobank_analytics.pmbb_saliva.scheduled_collection AS t1 LEFT JOIN biobank_analytics.pmbb_saliva.collected_sample AS t2 ON t1.collection_id = t2.collection_id WHERE t1.outcome IS NULL AND t1.EMPI NOT IN (SELECT EMPI FROM biobank_analytics.pmbb_saliva.collected_sample){date_conditions} ORDER BY t1.appointment_date, t1.appointment_time"
         cursor.execute(query, date_params)
 
         rows = cursor.fetchall()
@@ -482,6 +482,35 @@ def upcoming_collections():
     except Exception as e:
         return f"Error: {str(e)}"
     
+@app.route('/missed_collections', methods=['GET'])
+def missed_collections():
+    """Upcoming collections that were cancelled or missed (outcome = false)"""
+    try:
+        connection = get_databricks_connection()
+        cursor = connection.cursor()
+
+        date_from = request.args.get('date_from', '').strip()
+        date_to = request.args.get('date_to', '').strip()
+
+        date_conditions = ""
+        date_params = []
+        if date_from:
+            date_conditions += " AND t1.appointment_date >= ?"
+            date_params.append(date_from)
+        if date_to:
+            date_conditions += " AND t1.appointment_date <= ?"
+            date_params.append(date_to)
+
+        query = f"SELECT t1.*, t2.saliva_kit_id FROM biobank_analytics.pmbb_saliva.scheduled_collection AS t1 LEFT JOIN biobank_analytics.pmbb_saliva.collected_sample AS t2 ON t1.collection_id = t2.collection_id WHERE t1.outcome = FALSE{date_conditions} ORDER BY t1.appointment_date, t1.appointment_time"
+        cursor.execute(query, date_params)
+
+        rows = cursor.fetchall()
+        connection.close()
+
+        return render_template('missed_collections.html', rows=rows, date_from=date_from, date_to=date_to)
+    except Exception as e:
+        return f"Error: {str(e)}"
+
 @app.route('/participants', methods=['GET', 'POST'])
 def participants():
     """Jawn for the studies"""
