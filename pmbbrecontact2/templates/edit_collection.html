@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+
+{% block title %}Edit Collection{% endblock %}
+
+{% block content %}
+
+<h1 class="py-2"><i class="bi bi-pencil-square"></i> Edit Collection</h1>
+
+<div class="mb-3">
+    <strong>Collection ID:</strong> {{ row['collection_id'] }}<br>
+    <strong>Patient:</strong> {{ row['patient_name'] or row['EMPI'] }}
+</div>
+
+<form method="POST" action="/edit_collection/{{ row['collection_id'] }}" id="edit-form">
+
+    <div id="validation-alert" class="alert alert-warning d-none" role="alert"></div>
+
+    <div class="mb-3">
+        <label class="form-label">Saliva Tube Kit ID <i class="bi bi-upc-scan"></i></label>
+        <input type="number" step="1" class="form-control" name="saliva_kit_id" value="{{ row['saliva_kit_id'] }}" required>
+    </div>
+
+    <div class="mb-3">
+        <label class="form-label">Sharpie <i class="bi bi-pencil-fill"></i></label>
+        <input type="number" step="1" class="form-control" name="sharpie" value="{{ row['sharpie'] }}" required>
+    </div>
+
+    <button type="submit" class="btn btn-primary">Save Changes</button>
+    <a href="{{ url_for('completed_collections') }}" class="btn btn-secondary ms-1">Cancel</a>
+</form>
+
+<script>
+    document.getElementById('edit-form').addEventListener('submit', function(e) {
+        const kitVal = document.querySelector('[name="saliva_kit_id"]').value.trim();
+        const sharpieVal = document.querySelector('[name="sharpie"]').value.trim();
+        const alertBox = document.getElementById('validation-alert');
+        const messages = [];
+
+        const isValidInt = (val) => val !== '' && /^-?\d+$/.test(val);
+
+        if (!isValidInt(kitVal)) messages.push('Saliva Tube Kit ID is required and must be a whole number.');
+        if (!isValidInt(sharpieVal)) messages.push('Sharpie number is required and must be a whole number.');
+
+        if (messages.length > 0) {
+            e.preventDefault();
+            alertBox.innerHTML = messages.join('<br>');
+            alertBox.classList.remove('d-none');
+            alertBox.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        } else {
+            alertBox.classList.add('d-none');
+        }
+    });
+</script>
+
+{% endblock %}

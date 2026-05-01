@@ -571,6 +571,45 @@ def collect_me(collection_id):
         except Exception as e:
                 return f"Error: {str(e)}"
 
+@app.route('/edit_collection/<collection_id>', methods=['GET', 'POST'])
+def edit_collection(collection_id):
+    """Edit sharpie and saliva_kit_id on a completed collection"""
+    try:
+        connection = get_databricks_connection()
+        cursor = connection.cursor()
+
+        if request.method == 'GET':
+            query = """
+                SELECT cs.collection_id, cs.EMPI, cs.saliva_kit_id, cs.sharpie,
+                       sc.patient_name
+                FROM biobank_analytics.pmbb_saliva.collected_sample cs
+                LEFT JOIN biobank_analytics.pmbb_saliva.scheduled_collection sc
+                  ON cs.collection_id = sc.collection_id
+                WHERE cs.collection_id = ?
+                LIMIT 1
+            """
+            cursor.execute(query, [collection_id])
+            row = cursor.fetchone()
+            cursor.close()
+            connection.close()
+            if not row:
+                return "Collection not found", 404
+            return render_template('edit_collection.html', row=row)
+
+        if request.method == 'POST':
+            saliva_kit_id = int(request.form['saliva_kit_id'])
+            sharpie = int(request.form['sharpie'])
+            cursor.execute(
+                "UPDATE biobank_analytics.pmbb_saliva.collected_sample SET saliva_kit_id = ?, sharpie = ? WHERE collection_id = ?",
+                [saliva_kit_id, sharpie, collection_id]
+            )
+            connection.commit()
+            cursor.close()
+            connection.close()
+            return redirect(url_for('completed_collections'))
+    except Exception as e:
+        return f"Error: {str(e)}"
+
 @app.route('/cancel_collection/<collection_id>', methods=['POST'])
 def cancel_collection(collection_id):
     """Mark a scheduled collection as cancelled / missed (outcome = false)"""

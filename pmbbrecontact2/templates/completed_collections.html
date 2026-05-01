@@ -46,6 +46,7 @@
                 <th>Collected By</th>
                 <th>Location</th>
                 <th>Date Collected</th>
+                <th></th>
             </tr>
         </thead>
         <tbody>
@@ -58,6 +59,7 @@
                 <td>{{ row['collected_by'] }}</td>
                 <td>{{ row['location_name'] }}</td>
                 <td>{{ row['created_date'] }}</td>
+                <td><a href="{{ url_for('edit_collection', collection_id=row['collection_id']) }}" class="btn btn-sm btn-outline-secondary">Edit</a></td>
             </tr>
             {% endfor %}
         </tbody>
