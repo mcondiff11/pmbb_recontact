@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+
+{% block title %}Remove From PMBB{% endblock %}
+
+{% block content %}
+
+<h1 class="py-2"><i class="bi bi-x-octagon-fill"></i> Remove From PMBB</h1>
+
+{% if row %}
+<p class="lead">{{ row['Patient_name'] }} &mdash; EMPI: {{ person_id }}</p>
+{% else %}
+<p class="lead">EMPI: {{ person_id }}</p>
+{% endif %}
+
+<div class="alert alert-danger" role="alert">
+  <strong>Warning:</strong> This will record a withdrawal request for this participant.
+</div>
+
+<form method="POST" action="{{ url_for('withdraw', person_id=person_id) }}">
+  <input type="hidden" name="name" value="{{ row['Patient_name'] if row else '' }}">
+  <div class="mb-3">
+    <label for="notes" class="form-label">Notes</label>
+    <textarea class="form-control" id="notes" name="notes" rows="4" placeholder="Reason for withdrawal..."></textarea>
+  </div>
+  <a href="{{ url_for('person_details', person_id=person_id) }}" class="btn btn-secondary me-2">Cancel</a>
+  <button type="submit" class="btn btn-danger"><i class="bi bi-x-octagon-fill"></i> Confirm Remove From PMBB</button>
+</form>
+
+{% endblock %}

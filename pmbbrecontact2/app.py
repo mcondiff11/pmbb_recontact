@@ -574,6 +574,38 @@ def dnc_list():
     except Exception as e:
         return f"Error: {str(e)}"
 
+@app.route('/withdraw/<person_id>', methods=['GET', 'POST'])
+def withdraw(person_id):
+    """Withdraw a participant from PMBB"""
+    try:
+        connection = get_databricks_connection()
+        cursor = connection.cursor()
+
+        if request.method == 'POST':
+            name = request.form['name']
+            notes = request.form['notes']
+            user_email = get_current_databricks_user_email()
+            timestamp = datetime.now()
+            cursor.execute(
+                "INSERT INTO biobank_analytics.pmbb_saliva.withdraw (empi, name, inserted, user, notes) VALUES (?, ?, ?, ?, ?)",
+                [person_id, name, timestamp, user_email, notes]
+            )
+            connection.commit()
+            cursor.close()
+            connection.close()
+            return redirect(url_for('person_details', person_id=person_id))
+
+        cursor.execute(
+            "SELECT EMPI, Patient_name FROM biobank_analytics.pmbb_saliva.upcoming_appointments_for_saliva WHERE EMPI = ? LIMIT 1",
+            [person_id]
+        )
+        row = cursor.fetchone()
+        cursor.close()
+        connection.close()
+        return render_template('withdraw.html', person_id=person_id, row=row)
+    except Exception as e:
+        return f"Error: {str(e)}"
+
 @app.route('/donotcontact/<person_id>', methods=['GET', 'POST'])
 def do_not_contact(person_id):
     """Jawn for the studies"""
