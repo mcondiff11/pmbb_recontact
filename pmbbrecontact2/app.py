@@ -579,17 +579,31 @@ def do_not_contact(person_id):
         return f"Error: {str(e)}"
     
 @app.route('/collect_me/<collection_id>', methods=['GET', 'POST'])
-def collect_me(collection_id):
+@app.route('/collect_me/<collection_id>/<outcome>', methods=['GET'])
+def collect_me(collection_id, outcome=None):
     """COLLECT SAMPLE"""
 
     connection = get_databricks_connection()
     cursor = connection.cursor()
 
+    if request.method == 'GET' and outcome == 'false':
+        try:
+            cursor.execute("SELECT EMPI FROM biobank_analytics.pmbb_saliva.scheduled_collection WHERE collection_id = ? LIMIT 1", [collection_id])
+            row = cursor.fetchone()
+            empi = row['EMPI'] if row else None
+            cursor.execute("UPDATE biobank_analytics.pmbb_saliva.scheduled_collection SET outcome = FALSE WHERE collection_id = ?", [collection_id])
+            connection.commit()
+            cursor.close()
+            connection.close()
+            return redirect(url_for('person_details', person_id=empi))
+        except Exception as e:
+            return f"Error: {str(e)}"
+
     if request.method == 'GET':
         try:
-            query = "select * from biobank_analytics.pmbb_saliva.scheduled_collection where collection_id = ? LIMIT 1"              
-            cursor.execute(query,[collection_id])   
-                    
+            query = "select * from biobank_analytics.pmbb_saliva.scheduled_collection where collection_id = ? LIMIT 1"
+            cursor.execute(query,[collection_id])
+
             # Fetch all results
             rows = cursor.fetchall()
             cursor.close()
