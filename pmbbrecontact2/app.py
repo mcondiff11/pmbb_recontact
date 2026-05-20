@@ -164,13 +164,18 @@ def person_details(person_id):
         cursor.execute(collected_sample_query, (person_id))
         successful_collection = cursor.fetchone()
 
+        pre_app_query = f"SELECT * FROM biobank_analytics.pmbb_saliva.collected_previously_pmbb_saliva WHERE empi = {person_id} LIMIT 1"
+        cursor.execute(pre_app_query, (person_id))
+        pre_app_collection = cursor.fetchone()
+
         cursor.close()
         connection.close()
 
         return render_template('person.html', rows=rows, columns=columns,
                 confirmed_appointments=confirmed_appointments,
                 person_id=person_id, substudies=substudy_rows, contacts=contact_rows,
-                collections=scheduled_collection_rows, successful_collection=successful_collection) 
+                collections=scheduled_collection_rows, successful_collection=successful_collection,
+                pre_app_collection=pre_app_collection) 
     except Exception as e:
             return f"Error: {str(e)}"
 
