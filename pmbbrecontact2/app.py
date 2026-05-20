@@ -172,6 +172,10 @@ def person_details(person_id):
         cursor.execute(dnc_query, (person_id))
         dnc = cursor.fetchone()
 
+        withdraw_query = f"SELECT 1 FROM biobank_analytics.pmbb_saliva.withdraw WHERE empi = {person_id} LIMIT 1"
+        cursor.execute(withdraw_query, (person_id))
+        withdrawn = cursor.fetchone()
+
         cursor.close()
         connection.close()
 
@@ -179,7 +183,7 @@ def person_details(person_id):
                 confirmed_appointments=confirmed_appointments,
                 person_id=person_id, substudies=substudy_rows, contacts=contact_rows,
                 collections=scheduled_collection_rows, successful_collection=successful_collection,
-                pre_app_collection=pre_app_collection, dnc=dnc) 
+                pre_app_collection=pre_app_collection, dnc=dnc, withdrawn=withdrawn) 
     except Exception as e:
             return f"Error: {str(e)}"
 
@@ -223,7 +227,7 @@ def get_location_appointments(location_id):
             date_conditions += " AND A.AppointmentDate <= ?"
             date_params.append(date_to)
 
-        query = f"SELECT A.EMPI, A.Patient_email, A.Patient_name, A.AppointmentConfirmationStatus, A.AppointmentDate, A.AppointemntTime FROM biobank_analytics.pmbb_saliva.upcoming_appointments_for_saliva A LEFT JOIN biobank_analytics.pmbb_saliva.scheduled_collection B ON A.EMPI = B.EMPI WHERE A.DepartmentEpicId = {location_id} AND (B.collection_id IS NULL OR B.outcome <> true) AND NOT EXISTS (SELECT 1 FROM biobank_analytics.pmbb_saliva.collected_previously_pmbb_saliva C WHERE C.empi = A.EMPI){date_conditions}"
+        query = f"SELECT A.EMPI, A.Patient_email, A.Patient_name, A.AppointmentConfirmationStatus, A.AppointmentDate, A.AppointemntTime FROM biobank_analytics.pmbb_saliva.upcoming_appointments_for_saliva A LEFT JOIN biobank_analytics.pmbb_saliva.scheduled_collection B ON A.EMPI = B.EMPI WHERE A.DepartmentEpicId = {location_id} AND (B.collection_id IS NULL OR B.outcome <> true) AND NOT EXISTS (SELECT 1 FROM biobank_analytics.pmbb_saliva.collected_previously_pmbb_saliva C WHERE C.empi = A.EMPI) AND NOT EXISTS (SELECT 1 FROM biobank_analytics.pmbb_saliva.withdraw W WHERE W.empi = A.EMPI){date_conditions}"
         cursor.execute(query, date_params)
         rows = cursor.fetchall()
 
@@ -262,7 +266,7 @@ def get_location_appointments_export(location_id):
             date_conditions += " AND A.AppointmentDate <= ?"
             date_params.append(date_to)
 
-        query = f"SELECT A.EMPI, A.Patient_email, A.Patient_name, A.Patient_cell_phone, A.Patient_home_phone, A.AppointmentConfirmationStatus, A.AppointmentDate, A.AppointemntTime FROM biobank_analytics.pmbb_saliva.upcoming_appointments_for_saliva A LEFT JOIN biobank_analytics.pmbb_saliva.scheduled_collection B ON A.EMPI = B.EMPI WHERE A.DepartmentEpicId = {location_id} AND (B.collection_id IS NULL OR B.outcome <> true) AND NOT EXISTS (SELECT 1 FROM biobank_analytics.pmbb_saliva.collected_previously_pmbb_saliva C WHERE C.empi = A.EMPI){date_conditions}"
+        query = f"SELECT A.EMPI, A.Patient_email, A.Patient_name, A.Patient_cell_phone, A.Patient_home_phone, A.AppointmentConfirmationStatus, A.AppointmentDate, A.AppointemntTime FROM biobank_analytics.pmbb_saliva.upcoming_appointments_for_saliva A LEFT JOIN biobank_analytics.pmbb_saliva.scheduled_collection B ON A.EMPI = B.EMPI WHERE A.DepartmentEpicId = {location_id} AND (B.collection_id IS NULL OR B.outcome <> true) AND NOT EXISTS (SELECT 1 FROM biobank_analytics.pmbb_saliva.collected_previously_pmbb_saliva C WHERE C.empi = A.EMPI) AND NOT EXISTS (SELECT 1 FROM biobank_analytics.pmbb_saliva.withdraw W WHERE W.empi = A.EMPI){date_conditions}"
         cursor.execute(query, date_params)
         rows = cursor.fetchall()
 

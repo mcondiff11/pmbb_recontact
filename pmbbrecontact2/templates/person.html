@@ -65,6 +65,12 @@
 
 
 
+{% if withdrawn %}
+<div class="alert alert-danger" role="alert">
+  <i class="bi bi-x-octagon-fill"></i> <strong>Withdrawn from PMBB - Do not contact this participant.</strong>
+</div>
+{% endif %}
+
 {% if dnc %}
 <div class="alert alert-danger" role="alert">
   <i class="bi bi-slash-circle-fill"></i> <strong>Do Not Contact - Confirmed Patient Preference</strong>
