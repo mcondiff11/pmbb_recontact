@@ -560,6 +560,20 @@ def participants():
     except Exception as e:
         return f"Error: {str(e)}"
 
+@app.route('/dnc', methods=['GET'])
+def dnc_list():
+    """All Do Not Contact records"""
+    try:
+        connection = get_databricks_connection()
+        cursor = connection.cursor()
+        cursor.execute("SELECT EMPI, HUP_MRN, Patient_name, staff_member, inserted FROM biobank_analytics.pmbb_saliva.dnc ORDER BY inserted DESC")
+        rows = cursor.fetchall()
+        cursor.close()
+        connection.close()
+        return render_template('dnc.html', rows=rows)
+    except Exception as e:
+        return f"Error: {str(e)}"
+
 @app.route('/donotcontact/<person_id>', methods=['GET', 'POST'])
 def do_not_contact(person_id):
     """Jawn for the studies"""
