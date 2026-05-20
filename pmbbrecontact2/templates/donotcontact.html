@@ -19,22 +19,14 @@
 
 
 
-<div class="mb-3">
-  <label for="exampleFormControlInput1" class="form-label">EMPI</label>
-  <input type="text" class="form-control" id="empi" value="{{person_id}}" disabled readonly>
-</div>
-<div class="mb-3">
-  <label for="exampleFormControlTextarea1" class="form-label">Notes</label>
-  <textarea class="form-control" id="exampleFormControlTextarea1" name="staff_notes" rows="3"></textarea>
-</div>
-
-
-
-<div>
-
-  <a href="/donotcontact/1000231656" class="btn btn-warning"><i class="bi bi-telephone-x"></i> Do Not CONTACT</a>
-
-</div>
+{% if rows %}
+{% set row = rows[0] %}
+<form method="POST" action="{{ url_for('do_not_contact', person_id=person_id) }}">
+  <input type="hidden" name="hup_mrn" value="{{ row['HUP_MRN'] }}">
+  <input type="hidden" name="patient_name" value="{{ row['Patient_name'] }}">
+  <button type="submit" class="btn btn-warning"><i class="bi bi-telephone-x"></i> Confirm Do Not Contact</button>
+</form>
+{% endif %}
 
 {% if contact_rows %}
 <div class="table-responsive">

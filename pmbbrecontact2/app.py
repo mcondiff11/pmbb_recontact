@@ -562,19 +562,33 @@ def do_not_contact(person_id):
     try:
         connection = get_databricks_connection()
         cursor = connection.cursor()
-        query = "select * from biobank_analytics.pmbb_saliva.upcoming_appointments_for_saliva where EMPI = ? LIMIT 1"     
-        cursor.execute(query,[person_id])    
-                
-        # Fetch all results
+
+        if request.method == 'POST':
+            hup_mrn = request.form['hup_mrn']
+            patient_name = request.form['patient_name']
+            user_email = get_current_databricks_user_email()
+            timestamp = datetime.now()
+            cursor.execute(
+                "INSERT INTO biobank_analytics.pmbb_saliva.dnc (EMPI, HUP_MRN, Patient_name, staff_member, inserted) VALUES (?, ?, ?, ?, ?)",
+                [person_id, hup_mrn, patient_name, user_email, timestamp]
+            )
+            connection.commit()
+            cursor.close()
+            connection.close()
+            return redirect(url_for('person_details', person_id=person_id))
+
+        query = "SELECT EMPI, Patient_name, HUP_MRN FROM biobank_analytics.pmbb_saliva.upcoming_appointments_for_saliva WHERE EMPI = ? LIMIT 1"
+        cursor.execute(query, [person_id])
         rows = cursor.fetchall()
 
-        contact_query = "select * from biobank_analytics.pmbb_saliva.recontact where empi_id = ?";
-        cursor.execute(contact_query,[person_id])    
+        contact_query = "select * from biobank_analytics.pmbb_saliva.recontact where empi_id = ?"
+        cursor.execute(contact_query, [person_id])
         contact_rows = cursor.fetchall()
 
+        cursor.close()
         connection.close()
-      
-        return render_template('donotcontact.html', rows=rows, contact_rows=contact_rows)
+
+        return render_template('donotcontact.html', rows=rows, contact_rows=contact_rows, person_id=person_id)
     except Exception as e:
         return f"Error: {str(e)}"
     
