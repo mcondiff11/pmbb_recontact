@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+
+{% block title %}Collections Pre-App{% endblock %}
+
+{% block content %}
+
+<h1 class="py-2">Collections Pre-App</h1>
+<p>Total: <strong>{{ rows|length }}</strong></p>
+
+{% if rows %}
+<div class="table-responsive">
+    <table class="table table-striped table-bordered table-hover">
+        <thead class="table-dark">
+            <tr>
+                {% for col in columns %}
+                <th>{{ col }}</th>
+                {% endfor %}
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in rows %}
+            <tr>
+                {% for col in columns %}
+                <td>
+                    {% if col|lower == 'empi' %}
+                    <a href="{{ url_for('person_details', person_id=row[col]) }}">{{ row[col] }}</a>
+                    {% else %}
+                    {{ row[col] }}
+                    {% endif %}
+                </td>
+                {% endfor %}
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<p>No records found.</p>
+{% endif %}
+
+{% endblock %}

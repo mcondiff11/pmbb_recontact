@@ -453,6 +453,21 @@ def completed_collections():
     except Exception as e:
         return f"Error: {str(e)}"
 
+@app.route('/collections_pre_app', methods=['GET'])
+def collections_pre_app():
+    """All rows in collected_previously_pmbb_saliva"""
+    try:
+        connection = get_databricks_connection()
+        cursor = connection.cursor()
+        cursor.execute("SELECT * FROM biobank_analytics.pmbb_saliva.collected_previously_pmbb_saliva ORDER BY empi")
+        rows = cursor.fetchall()
+        columns = [desc[0] for desc in cursor.description] if cursor.description else []
+        cursor.close()
+        connection.close()
+        return render_template('collections_pre_app.html', rows=rows, columns=columns)
+    except Exception as e:
+        return f"Error: {str(e)}"
+
 @app.route('/upcoming_collections', methods=['GET', 'POST'])
 def upcoming_collections():
     """Jawn for the studies"""
