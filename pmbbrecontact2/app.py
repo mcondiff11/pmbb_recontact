@@ -168,6 +168,10 @@ def person_details(person_id):
         cursor.execute(pre_app_query, (person_id))
         pre_app_collection = cursor.fetchone()
 
+        dnc_query = f"SELECT 1 FROM biobank_analytics.pmbb_saliva.dnc WHERE EMPI = {person_id} LIMIT 1"
+        cursor.execute(dnc_query, (person_id))
+        dnc = cursor.fetchone()
+
         cursor.close()
         connection.close()
 
@@ -175,7 +179,7 @@ def person_details(person_id):
                 confirmed_appointments=confirmed_appointments,
                 person_id=person_id, substudies=substudy_rows, contacts=contact_rows,
                 collections=scheduled_collection_rows, successful_collection=successful_collection,
-                pre_app_collection=pre_app_collection) 
+                pre_app_collection=pre_app_collection, dnc=dnc) 
     except Exception as e:
             return f"Error: {str(e)}"
 
