@@ -107,6 +107,8 @@
         <td colspan="3"><strong style="color:green">COLLECTED</strong> <i class="bi bi-check2"></i>
         {% set ns.collected = 1 %}
         </td>
+      {% elif collection_rows['outcome'] == false %}
+        <td colspan="3"><strong style="color:#888">Cancelled / Missed</strong> <i class="bi bi-calendar-x"></i></td>
       {% else %}
         <td><a class="btn btn-outline-success" href="{{ url_for('collect_me', collection_id=collection_rows['collection_id']) }}"><i class="bi bi-calendar-check"></i> Successful Collection</a></td>
         <td>
