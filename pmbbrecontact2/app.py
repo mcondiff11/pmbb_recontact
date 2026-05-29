@@ -708,6 +708,51 @@ def collect_me(collection_id, outcome=None):
         except Exception as e:
                 return f"Error: {str(e)}"
 
+@app.route('/communications', methods=['GET'])
+def communications():
+    try:
+        connection = get_databricks_connection()
+        cursor = connection.cursor()
+
+        search = request.args.get('search', '').strip()
+        staff_filter = request.args.get('staff_member', '').strip()
+        page = max(1, int(request.args.get('page', 1)))
+        per_page = 50
+        offset = (page - 1) * per_page
+
+        cursor.execute("SELECT DISTINCT staff_member FROM biobank_analytics.pmbb_saliva.recontact ORDER BY staff_member")
+        staff_members = [r['staff_member'] for r in cursor.fetchall() if r['staff_member']]
+
+        conditions = []
+        params = []
+        if search:
+            conditions.append("notes LIKE ?")
+            params.append(f"%{search}%")
+        if staff_filter:
+            conditions.append("staff_member = ?")
+            params.append(staff_filter)
+
+        where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
+
+        count_query = f"SELECT COUNT(*) AS cnt FROM biobank_analytics.pmbb_saliva.recontact {where}"
+        cursor.execute(count_query, params)
+        total = cursor.fetchone()['cnt']
+        total_pages = max(1, (total + per_page - 1) // per_page)
+
+        data_query = f"SELECT empi_id, contact_type, inserted, notes, staff_member FROM biobank_analytics.pmbb_saliva.recontact {where} ORDER BY inserted DESC LIMIT {per_page} OFFSET {offset}"
+        cursor.execute(data_query, params)
+        rows = cursor.fetchall()
+
+        cursor.close()
+        connection.close()
+
+        return render_template('communications.html', rows=rows, staff_members=staff_members,
+                               search=search, staff_filter=staff_filter,
+                               page=page, total_pages=total_pages, total=total)
+    except Exception as e:
+        return f"Error: {str(e)}"
+
+
 @app.route('/edit_collection/<collection_id>', methods=['GET', 'POST'])
 def edit_collection(collection_id):
     """Edit sharpie and saliva_kit_id on a completed collection"""
