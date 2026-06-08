@@ -256,6 +256,7 @@ def get_location_appointments_export(location_id):
 
         date_from = request.args.get('date_from', '').strip()
         date_to = request.args.get('date_to', '').strip()
+        business_hours = request.args.get('business_hours', '')
 
         date_conditions = ""
         date_params = []
@@ -265,6 +266,8 @@ def get_location_appointments_export(location_id):
         if date_to:
             date_conditions += " AND A.AppointmentDate <= ?"
             date_params.append(date_to)
+        if business_hours:
+            date_conditions += " AND date_format(CAST(A.AppointmentInstant AS TIMESTAMP), 'HH:mm:ss') >= '08:00:00' AND date_format(CAST(A.AppointmentInstant AS TIMESTAMP), 'HH:mm:ss') <= '16:30:00'"
 
         query = f"SELECT A.EMPI, A.Patient_email, A.Patient_name, A.Patient_cell_phone, A.Patient_home_phone, A.AppointmentConfirmationStatus, A.AppointmentDate, A.AppointemntTime FROM biobank_analytics.pmbb_saliva.upcoming_appointments_for_saliva A LEFT JOIN biobank_analytics.pmbb_saliva.scheduled_collection B ON A.EMPI = B.EMPI WHERE A.DepartmentEpicId = {location_id} AND (B.collection_id IS NULL OR B.outcome <> true) AND NOT EXISTS (SELECT 1 FROM biobank_analytics.pmbb_saliva.collected_previously_pmbb_saliva C WHERE C.empi = A.EMPI) AND NOT EXISTS (SELECT 1 FROM biobank_analytics.pmbb_saliva.withdraw W WHERE W.empi = A.EMPI) AND NOT EXISTS (SELECT 1 FROM biobank_analytics.pmbb_saliva.dnc D WHERE D.EMPI = A.EMPI){date_conditions}"
         cursor.execute(query, date_params)
@@ -277,7 +280,7 @@ def get_location_appointments_export(location_id):
         cursor.close()
         connection.close()
 
-        return render_template('location_export.html', rows=rows, location_info=location_information, date_from=date_from, date_to=date_to)
+        return render_template('location_export.html', rows=rows, location_info=location_information, date_from=date_from, date_to=date_to, business_hours=business_hours)
     except Exception as e:
         return f"Error: {str(e)}"
     
