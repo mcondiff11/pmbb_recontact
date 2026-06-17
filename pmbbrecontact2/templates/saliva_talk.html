@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+
+{% block title %}Saliva Talk{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between py-3">
+    <h1>Saliva Talk</h1>
+    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#postModal" onclick="setParent('', '')">
+        New Post
+    </button>
+</div>
+
+{% if flat_posts %}
+    {% for item in flat_posts %}
+    <div class="card mb-2" style="margin-left: {{ (item.level - 1) * 40 }}px;">
+        <div class="card-body py-2">
+            <p class="mb-1">{{ item.post['talk'] }}</p>
+            <div class="d-flex align-items-center gap-3">
+                <small class="text-muted">{{ item.post['user_email'] }} &middot; {{ item.post['talk_timestamp'] }}</small>
+                {% if item.level < 3 %}
+                <button class="btn btn-sm btn-outline-secondary"
+                        data-bs-toggle="modal" data-bs-target="#postModal"
+                        onclick="setParent('{{ item.post['id'] }}', {{ item.post['talk'] | tojson }})">
+                    Reply
+                </button>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+{% else %}
+    <p class="text-muted">No posts yet. Be the first to post!</p>
+{% endif %}
+
+<!-- Post / Reply Modal -->
+<div class="modal fade" id="postModal" tabindex="-1" aria-labelledby="postModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="POST" action="/saliva_talk">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="postModalLabel">New Post</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="replyContext" class="alert alert-secondary py-1 small mb-2" style="display:none;"></div>
+                    <textarea name="talk" id="talkInput" class="form-control" rows="4" placeholder="What's on your mind?" required></textarea>
+                    <input type="hidden" name="parent_talk_id" id="parentTalkId" value="">
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Post</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+function setParent(parentId, parentText) {
+    const label = document.getElementById('postModalLabel');
+    const input = document.getElementById('parentTalkId');
+    const context = document.getElementById('replyContext');
+    const talkInput = document.getElementById('talkInput');
+    talkInput.value = '';
+    if (parentId) {
+        label.textContent = 'Reply';
+        input.value = parentId;
+        const preview = parentText.length > 80 ? parentText.substring(0, 80) + '...' : parentText;
+        context.textContent = 'Replying to: "' + preview + '"';
+        context.style.display = 'block';
+    } else {
+        label.textContent = 'New Post';
+        input.value = '';
+        context.style.display = 'none';
+    }
+}
+</script>
+{% endblock %}

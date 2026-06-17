@@ -857,5 +857,63 @@ def search():
         mrn_query=mrn_query,     mrn_results=mrn_results,
         empi_query=empi_query,   empi_results=empi_results)
 
+@app.route('/saliva_talk', methods=['GET', 'POST'])
+def saliva_talk():
+    try:
+        connection = get_databricks_connection()
+        cursor = connection.cursor()
+
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS biobank_analytics.pmbb_saliva.saliva_talk (
+                id BIGINT GENERATED ALWAYS AS IDENTITY,
+                talk STRING,
+                user_email STRING,
+                talk_timestamp TIMESTAMP,
+                parent_talk_id BIGINT
+            )
+        """)
+
+        if request.method == 'POST':
+            talk = request.form.get('talk', '').strip()
+            parent_talk_id_raw = request.form.get('parent_talk_id', '').strip()
+            parent_talk_id = int(parent_talk_id_raw) if parent_talk_id_raw else None
+            user_email = get_current_databricks_user_email()
+            current_time = datetime.now()
+
+            cursor.execute(
+                "INSERT INTO biobank_analytics.pmbb_saliva.saliva_talk (talk, user_email, talk_timestamp, parent_talk_id) VALUES (?, ?, ?, ?)",
+                (talk, user_email, current_time, parent_talk_id)
+            )
+            connection.commit()
+            cursor.close()
+            connection.close()
+            return redirect(url_for('saliva_talk'))
+
+        cursor.execute("SELECT id, talk, user_email, talk_timestamp, parent_talk_id FROM biobank_analytics.pmbb_saliva.saliva_talk ORDER BY talk_timestamp ASC")
+        rows = cursor.fetchall()
+        cursor.close()
+        connection.close()
+
+        by_id = {row['id']: {'data': row, 'children': []} for row in rows}
+        roots = []
+        for row in rows:
+            pid = row['parent_talk_id']
+            if pid is None:
+                roots.append(by_id[row['id']])
+            elif pid in by_id:
+                by_id[pid]['children'].append(by_id[row['id']])
+
+        flat_posts = []
+        def dfs(node, level):
+            flat_posts.append({'post': node['data'], 'level': level})
+            for child in node['children']:
+                dfs(child, level + 1)
+        for root in roots:
+            dfs(root, 1)
+
+        return render_template('saliva_talk.html', flat_posts=flat_posts)
+    except Exception as e:
+        return f"Error: {str(e)}"
+
 if __name__ == "__main__":
     app.run(host='0.0.0.0', debug=True)
