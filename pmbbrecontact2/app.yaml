@@ -1,1 +1,4 @@
 command: ["gunicorn", "-b", "0.0.0.0", "app:app"]
+env:
+  - name: DATABRICKS_WAREHOUSE_ID
+    valueFrom: sql-warehouse

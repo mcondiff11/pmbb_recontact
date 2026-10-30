@@ -3,13 +3,17 @@ from databricks import sql
 import pandas as pd
 import os
 import math
-from databricks.sdk import WorkspaceClient
+from databricks.sdk.core import Config
 from datetime import datetime
 from dotenv import load_dotenv
 
 load_dotenv()
 
 app = Flask(__name__)
+
+# OAuth config: in Databricks Apps this resolves to the app's service principal
+# (DATABRICKS_HOST/CLIENT_ID/CLIENT_SECRET are injected); locally it uses .env or a CLI profile
+cfg = Config()
 
 # Configuration
 ROWS_PER_PAGE = 100
@@ -32,10 +36,12 @@ def get_current_databricks_user_email():
 
 def get_databricks_connection():
     """Create and return a Databricks SQL connection"""
+    server_hostname = os.getenv("DATABRICKS_SERVER_HOSTNAME") or cfg.host.removeprefix("https://")
+    http_path = os.getenv("DATABRICKS_HTTP_PATH") or f"/sql/1.0/warehouses/{os.environ['DATABRICKS_WAREHOUSE_ID']}"
     return sql.connect(
-        server_hostname=os.environ["DATABRICKS_SERVER_HOSTNAME"],
-        http_path=os.environ["DATABRICKS_HTTP_PATH"],
-        access_token=os.environ["DATABRICKS_ACCESS_TOKEN"]
+        server_hostname=server_hostname,
+        http_path=http_path,
+        credentials_provider=lambda: cfg.authenticate
     )
 
 # Set up Databricks connection
