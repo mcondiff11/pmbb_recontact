@@ -4,7 +4,8 @@ import pandas as pd
 import os
 import math
 from databricks.sdk.core import Config
-from datetime import datetime
+from datetime import datetime, date, timedelta
+from zoneinfo import ZoneInfo
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -201,9 +202,16 @@ def get_locations():
         connection = get_databricks_connection()
         cursor = connection.cursor()
 
-        query = "SELECT DepartmentEpicId, DepartmentName,DepartmentExternalName,ParentLocationName,PostalCode,UnivCity_recontact_location from biobank_analytics.pmbb_saliva.departments order by UnivCity_recontact_location desc"              
+        query = """
+            SELECT d.DepartmentEpicId, d.DepartmentName, d.DepartmentExternalName, d.ParentLocationName, d.PostalCode, d.UnivCity_recontact_location,
+                   COALESCE(s.texting_enabled, TRUE) AS texting_enabled
+            FROM biobank_analytics.pmbb_saliva.departments d
+            LEFT JOIN biobank_analytics.pmbb_saliva.department_texting_settings s
+              ON s.DepartmentEpicId = CAST(d.DepartmentEpicId AS STRING)
+            ORDER BY d.UnivCity_recontact_location DESC
+        """
         cursor.execute(query)
-                
+
         # Fetch all results
         rows = cursor.fetchall()
         cursor.close()
@@ -212,6 +220,40 @@ def get_locations():
         return render_template('locations.html', rows=rows)
     except Exception as e:
         return f"Error: {str(e)}"
+
+@app.route('/location/<location_id>/texting', methods=['POST'])
+def set_department_texting(location_id):
+    """Turn Switchboard text messages on/off for a department (read by the switchboard cron job)"""
+    try:
+        data = request.get_json(silent=True) or {}
+        if not isinstance(data.get('enabled'), bool):
+            return jsonify({'error': "'enabled' must be true or false"}), 400
+        enabled = data['enabled']
+        department_id = str(location_id)
+        user_email = get_current_databricks_user_email()
+        timestamp = datetime.now()
+
+        with get_databricks_connection() as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    MERGE INTO biobank_analytics.pmbb_saliva.department_texting_settings t
+                    USING (SELECT ? AS DepartmentEpicId, ? AS texting_enabled, ? AS updated_by, ? AS updated_at) src
+                      ON t.DepartmentEpicId = src.DepartmentEpicId
+                    WHEN MATCHED THEN UPDATE SET
+                        t.texting_enabled = src.texting_enabled, t.updated_by = src.updated_by, t.updated_at = src.updated_at
+                    WHEN NOT MATCHED THEN INSERT (DepartmentEpicId, texting_enabled, updated_by, updated_at)
+                        VALUES (src.DepartmentEpicId, src.texting_enabled, src.updated_by, src.updated_at)
+                    """,
+                    [department_id, enabled, user_email, timestamp]
+                )
+                cursor.execute(
+                    "INSERT INTO biobank_analytics.pmbb_saliva.department_texting_log (DepartmentEpicId, texting_enabled, changed_by, changed_at) VALUES (?, ?, ?, ?)",
+                    [department_id, enabled, user_email, timestamp]
+                )
+        return jsonify({'DepartmentEpicId': department_id, 'enabled': enabled})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/location/<location_id>', methods=['GET', 'POST'])
 def get_location_appointments(location_id):
@@ -519,6 +561,84 @@ def upcoming_collections():
     except Exception as e:
         return f"Error: {str(e)}"
     
+@app.route('/switchboard_collections', methods=['GET'])
+def switchboard_collections():
+    """Switchboard responses (prepared.switchboard.biobank_responses) grouped by department.
+    Defaults to today + the next 2 days; a picked date shows only that day."""
+    try:
+        # Use Philadelphia time so "today" doesn't roll over early on a UTC server
+        today = datetime.now(ZoneInfo("America/New_York")).date()
+
+        selected_date = request.args.get('date', '').strip()
+        dept_id = request.args.get('dept_id', '').strip()
+
+        if selected_date:
+            try:
+                start = date.fromisoformat(selected_date)
+            except ValueError:
+                start, selected_date = today, ''
+            end = start if selected_date else today + timedelta(days=2)
+        else:
+            start, end = today, today + timedelta(days=2)
+
+        conditions = "to_date(r.appt_date) BETWEEN ? AND ?"
+        params = [start.isoformat(), end.isoformat()]
+        if dept_id:
+            conditions += " AND r.dept_id = ?"
+            params.append(dept_id)
+
+        query = f"""
+            SELECT r.csn, r.uid, r.appt_date, r.dept_id, r.response,
+                   d.DepartmentName,
+                   u.EMPI, u.Patient_name
+            FROM prepared.switchboard.biobank_responses r
+            LEFT JOIN biobank_analytics.pmbb_saliva.departments d
+              ON CAST(d.DepartmentEpicId AS STRING) = r.dept_id
+            LEFT JOIN (
+                -- one row per CSN (a CSN can have several text attempts)
+                SELECT EncounterEpicCsn, MAX(EMPI) AS EMPI, MAX(Patient_name) AS Patient_name
+                FROM biobank_analytics.pmbb_saliva.switchboard_text_attempts
+                GROUP BY EncounterEpicCsn
+            ) u ON u.EncounterEpicCsn = r.csn
+            WHERE {conditions}
+            ORDER BY d.DepartmentName, r.dept_id, r.appt_date
+        """
+
+        # Department picker: every department that has responses from today onward
+        dept_query = """
+            SELECT DISTINCT r.dept_id, d.DepartmentName
+            FROM prepared.switchboard.biobank_responses r
+            LEFT JOIN biobank_analytics.pmbb_saliva.departments d
+              ON CAST(d.DepartmentEpicId AS STRING) = r.dept_id
+            WHERE to_date(r.appt_date) >= ?
+            ORDER BY d.DepartmentName, r.dept_id
+        """
+
+        with get_databricks_connection() as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(query, params)
+                rows = [r.asDict() for r in cursor.fetchall()]
+                cursor.execute(dept_query, [today.isoformat()])
+                departments = [r.asDict() for r in cursor.fetchall()]
+
+        # Group by department, preserving the SQL ordering
+        groups = {}
+        for row in rows:
+            groups.setdefault(row['dept_id'], {'dept_id': row['dept_id'], 'name': row['DepartmentName'], 'rows': []})['rows'].append(row)
+
+        return render_template(
+            'switchboard_collections.html',
+            groups=list(groups.values()),
+            total=len(rows),
+            departments=departments,
+            selected_date=selected_date,
+            dept_id=dept_id,
+            start=start,
+            end=end,
+        )
+    except Exception as e:
+        return f"Error: {str(e)}"
+
 @app.route('/missed_collections', methods=['GET'])
 def missed_collections():
     """Upcoming collections that were cancelled or missed (outcome = false)"""

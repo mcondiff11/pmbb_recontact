@@ -27,6 +27,7 @@
                         <th>Parent</th>
                         <th>Zip</th>
                         <th>Preferred Location</th>
+                        <th>Switchboard Texts</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -48,10 +49,20 @@
                             {% else %}
                                 &nbsp;
                             {% endif %}
-                           
 
 
 
+
+                        </td>
+                        <td data-order="{{ 1 if row['texting_enabled'] else 0 }}">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input texting-toggle" type="checkbox" role="switch"
+                                       id="texting-{{ row['DepartmentEpicId'] }}"
+                                       data-dept="{{ row['DepartmentEpicId'] }}"
+                                       data-name="{{ row['DepartmentName'] }}"
+                                       {% if row['texting_enabled'] %}checked{% endif %}>
+                                <label class="form-check-label small" for="texting-{{ row['DepartmentEpicId'] }}">{{ 'On' if row['texting_enabled'] else 'Off' }}</label>
+                            </div>
                         </td>
                     </tr>
                    {% endfor %}
@@ -72,6 +83,34 @@ $(function(){
     	"lengthMenu": [ 25, 50, 100 ],
     	"pageLength":25,
         order: [[5, 'desc']]
+    });
+
+    // Delegated so it works on every DataTables page
+    $(document).on('change', '.texting-toggle', function(){
+        var $box = $(this);
+        var enabled = $box.is(':checked');
+        var name = $box.data('name');
+        var msg = enabled
+            ? 'Turn ON Switchboard text messages for ' + name + '?'
+            : 'Turn OFF Switchboard text messages for ' + name + '?\n\nPatients with appointments here will stop getting texts starting with the next cron run.';
+        if (!confirm(msg)) { $box.prop('checked', !enabled); return; }
+
+        $box.prop('disabled', true);
+        fetch('/location/' + encodeURIComponent($box.data('dept')) + '/texting', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({enabled: enabled})
+        })
+        .then(function(r){ return r.json().then(function(j){ if (!r.ok) throw new Error(j.error || r.status); return j; }); })
+        .then(function(){
+            $box.siblings('label').text(enabled ? 'On' : 'Off');
+            $box.closest('td').attr('data-order', enabled ? 1 : 0);
+        })
+        .catch(function(err){
+            $box.prop('checked', !enabled);
+            alert('Could not save setting: ' + err.message);
+        })
+        .finally(function(){ $box.prop('disabled', false); });
     });
 })
 </script>

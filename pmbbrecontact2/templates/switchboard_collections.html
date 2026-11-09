@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+
+{% block title %}Switchboard Collections{% endblock %}
+
+{% block content %}
+
+<h1>Switchboard Collections</h1>
+<p>
+    {% if start == end %}
+        {{ start.strftime('%A, %B %d, %Y') }}
+    {% else %}
+        {{ start.strftime('%a %m/%d') }} &ndash; {{ end.strftime('%a %m/%d/%Y') }}
+    {% endif %}
+    &nbsp;|&nbsp; Total: {{ total }}
+    &nbsp;|&nbsp; Departments: {{ groups|length }}
+</p>
+
+<form method="GET" class="row g-2 align-items-end mb-4">
+    <div class="col-auto">
+        <label for="date" class="form-label mb-0">Day</label>
+        <input type="date" class="form-control" id="date" name="date" value="{{ selected_date }}">
+    </div>
+    <div class="col-md-4">
+        <label for="dept_id" class="form-label mb-0">Department</label>
+        <select class="form-select" id="dept_id" name="dept_id">
+            <option value="">All departments</option>
+            {% for d in departments %}
+            <option value="{{ d['dept_id'] }}" {% if d['dept_id'] == dept_id %}selected{% endif %}>
+                {{ d['DepartmentName'] or 'Unknown department' }} ({{ d['dept_id'] }})
+            </option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="col-auto">
+        <button type="submit" class="btn btn-primary">Filter</button>
+        {% if selected_date or dept_id %}
+        <a href="{{ request.path }}" class="btn btn-outline-secondary ms-1">Clear (next 3 days)</a>
+        {% endif %}
+    </div>
+</form>
+
+{% if groups %}
+    {% for g in groups %}
+    <h4 class="mt-4">
+        {{ g['name'] or 'Unknown department' }}
+        <small class="text-muted">{{ g['dept_id'] }}</small>
+        <span class="badge bg-secondary">{{ g['rows']|length }}</span>
+    </h4>
+    <div class="table-responsive">
+        <table class="table table-striped table-bordered table-hover">
+            <thead class="table-dark">
+                <tr>
+                    <th>Appointment</th>
+                    <th>Patient</th>
+                    <th>CSN</th>
+                    <th>UID</th>
+                    <th>Response</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in g['rows'] %}
+                <tr>
+                    <td>{{ row['appt_date'].strftime('%a %m/%d/%Y %I:%M %p') if row['appt_date'] else '' }}</td>
+                    <td>
+                        {% if row['EMPI'] %}
+                            <a href="{{ url_for('person_details', person_id=row['EMPI']) }}" class="person-link">{{ row['Patient_name'] or row['EMPI'] }}</a>
+                        {% else %}
+                            <span class="text-muted">No text attempt found</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ row['csn'] }}</td>
+                    <td>{{ row['uid'] }}</td>
+                    <td>{{ row['response'] }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endfor %}
+{% else %}
+<p>No scheduled collections found.</p>
+{% endif %}
+
+{% endblock %}
