@@ -563,7 +563,7 @@ def upcoming_collections():
     
 @app.route('/switchboard_collections', methods=['GET'])
 def switchboard_collections():
-    """Switchboard responses (prepared.switchboard.biobank_responses) grouped by department.
+    """Scheduled collections created from Switchboard "Yes" replies, grouped by department.
     Defaults to today + the next 2 days; a picked date shows only that day."""
     try:
         # Use Philadelphia time so "today" doesn't roll over early on a UTC server
@@ -581,37 +581,28 @@ def switchboard_collections():
         else:
             start, end = today, today + timedelta(days=2)
 
-        conditions = "to_date(r.appt_date) BETWEEN ? AND ?"
+        conditions = "t1.staff_member = 'switchboard' AND to_date(t1.appointment_date) BETWEEN ? AND ?"
         params = [start.isoformat(), end.isoformat()]
         if dept_id:
-            conditions += " AND r.dept_id = ?"
+            conditions += " AND CAST(t1.DepartmentEpicId AS STRING) = ?"
             params.append(dept_id)
 
+        # Collections the switchboard results job scheduled (patients who texted back Yes)
         query = f"""
-            SELECT r.csn, r.uid, r.appt_date, r.dept_id, r.response,
-                   d.DepartmentName,
-                   u.EMPI, u.Patient_name
-            FROM prepared.switchboard.biobank_responses r
-            LEFT JOIN biobank_analytics.pmbb_saliva.departments d
-              ON CAST(d.DepartmentEpicId AS STRING) = r.dept_id
-            LEFT JOIN (
-                -- one row per CSN (a CSN can have several text attempts)
-                SELECT EncounterEpicCsn, MAX(EMPI) AS EMPI, MAX(Patient_name) AS Patient_name
-                FROM biobank_analytics.pmbb_saliva.switchboard_text_attempts
-                GROUP BY EncounterEpicCsn
-            ) u ON u.EncounterEpicCsn = r.csn
+            SELECT t1.*, t2.saliva_kit_id
+            FROM biobank_analytics.pmbb_saliva.scheduled_collection t1
+            LEFT JOIN biobank_analytics.pmbb_saliva.collected_sample t2 ON t1.collection_id = t2.collection_id
             WHERE {conditions}
-            ORDER BY d.DepartmentName, r.dept_id, r.appt_date
+            ORDER BY t1.location_name, t1.DepartmentEpicId, t1.appointment_date, t1.appointment_time
         """
 
-        # Department picker: every department that has responses from today onward
+        # Department picker: every department with a switchboard collection from today onward
         dept_query = """
-            SELECT DISTINCT r.dept_id, d.DepartmentName
-            FROM prepared.switchboard.biobank_responses r
-            LEFT JOIN biobank_analytics.pmbb_saliva.departments d
-              ON CAST(d.DepartmentEpicId AS STRING) = r.dept_id
-            WHERE to_date(r.appt_date) >= ?
-            ORDER BY d.DepartmentName, r.dept_id
+            SELECT CAST(DepartmentEpicId AS STRING) AS dept_id, MAX(location_name) AS location_name
+            FROM biobank_analytics.pmbb_saliva.scheduled_collection
+            WHERE staff_member = 'switchboard' AND to_date(appointment_date) >= ?
+            GROUP BY CAST(DepartmentEpicId AS STRING)
+            ORDER BY location_name
         """
 
         with get_databricks_connection() as connection:
@@ -624,7 +615,8 @@ def switchboard_collections():
         # Group by department, preserving the SQL ordering
         groups = {}
         for row in rows:
-            groups.setdefault(row['dept_id'], {'dept_id': row['dept_id'], 'name': row['DepartmentName'], 'rows': []})['rows'].append(row)
+            key = str(row['DepartmentEpicId'])
+            groups.setdefault(key, {'dept_id': key, 'name': row['location_name'], 'rows': []})['rows'].append(row)
 
         return render_template(
             'switchboard_collections.html',
