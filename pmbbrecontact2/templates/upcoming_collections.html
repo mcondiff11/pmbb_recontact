@@ -48,7 +48,11 @@
                 <tbody>
                    {% for row in rows %}
                     <tr>
-                       <td> <a href="{{ url_for('person_details', person_id=row['EMPI']) }}" class="person-link">{{ row['patient_name'] }}</a></td>
+                       <td> <a href="{{ url_for('person_details', person_id=row['EMPI']) }}" class="person-link">{{ row['patient_name'] }}</a>
+                           {% if row['staff_member'] == 'switchboard' %}
+                           <i class="bi bi-chat-dots text-primary ms-1" title="Scheduled from a Switchboard text reply" aria-label="Scheduled from a Switchboard text reply"></i>
+                           {% endif %}
+                       </td>
                        <td><a href="{{ url_for('get_location_appointments', location_id=row['DepartmentEpicId']) }}" class="person-link">{{ row['location_name'] }}</a></td>
                        <td>{{row['appointment_date']}}</td>
                        <td>{{ row['appointment_time'] }}</td>
