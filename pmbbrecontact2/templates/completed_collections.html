@@ -52,14 +52,20 @@
         <tbody>
             {% for row in rows %}
             <tr>
-                <td>{{ row['collection_id'] }}</td>
+                <td>{{ row['collection_id'] if row['collection_id'] is not none else '' }}</td>
                 <td><a href="{{ url_for('person_details', person_id=row['EMPI']) }}">{{ row['patient_name'] or row['EMPI'] }}</a></td>
                 <td>{{ row['saliva_kit_id'] }}</td>
                 <td>{{ row['sharpie'] }}</td>
                 <td>{{ row['collected_by'] }}</td>
                 <td>{{ row['location_name'] }}</td>
                 <td>{{ row['created_date'] }}</td>
-                <td><a href="{{ url_for('edit_collection', collection_id=row['collection_id']) }}" class="btn btn-sm btn-outline-secondary">Edit</a></td>
+                <td>
+                    {% if row['collection_id'] is not none %}
+                    <a href="{{ url_for('edit_collection', collection_id=row['collection_id']) }}" class="btn btn-sm btn-outline-secondary">Edit</a>
+                    {% elif row['sample_id'] is not none %}
+                    <a href="{{ url_for('edit_sample', sample_id=row['sample_id']) }}" class="btn btn-sm btn-outline-secondary">Edit</a>
+                    {% endif %}
+                </td>
             </tr>
             {% endfor %}
         </tbody>

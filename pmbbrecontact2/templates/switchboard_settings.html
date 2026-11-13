@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+
+{% block title %}Switchboard Settings{% endblock %}
+
+{% block content %}
+
+<h1>Switchboard Texts</h1>
+<p class="text-muted">
+    Only the departments switched <strong>On</strong> below get Switchboard text messages. Every other department is off.
+    Changes take effect at the next run of the send job, which texts patients 4 days before their appointment.
+</p>
+
+{% if rows %}
+<div class="table-responsive">
+    <table class="table table-striped table-bordered align-middle">
+        <thead class="table-dark">
+            <tr>
+                <th>Department</th>
+                <th>DepartmentEpicId</th>
+                <th>Switchboard Texts</th>
+                <th>Last changed</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in rows %}
+            <tr>
+                <td>
+                    {{ row['DepartmentName'] or 'Unknown department' }}
+                    {% if row['ParentLocationName'] %}<br><small class="text-muted">{{ row['ParentLocationName'] }}</small>{% endif %}
+                </td>
+                <td>{{ row['DepartmentEpicId'] }}</td>
+                <td>
+                    <div class="form-check form-switch">
+                        <input class="form-check-input texting-toggle" type="checkbox" role="switch"
+                               id="texting-{{ row['DepartmentEpicId'] }}"
+                               data-dept="{{ row['DepartmentEpicId'] }}"
+                               data-name="{{ row['DepartmentName'] or row['DepartmentEpicId'] }}"
+                               {% if row['texting_enabled'] %}checked{% endif %}>
+                        <label class="form-check-label" for="texting-{{ row['DepartmentEpicId'] }}">{{ 'On' if row['texting_enabled'] else 'Paused' }}</label>
+                    </div>
+                </td>
+                <td class="small text-muted">
+                    {% if row['updated_at'] %}{{ row['updated_at'].strftime('%m/%d/%Y %I:%M %p') }}{% endif %}
+                    {% if row['updated_by'] %}<br>{{ row['updated_by'] }}{% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<p>No departments are set up for Switchboard texts yet, so no texts are being sent.</p>
+{% endif %}
+
+<h5 class="mt-4">Add a department</h5>
+<form id="add-form" class="row g-2 align-items-end">
+    <div class="col-md-6">
+        <select id="add-dept" class="form-select" required>
+            <option value="">Choose a department...</option>
+            {% for d in available %}
+            <option value="{{ d['DepartmentEpicId'] }}">{{ d['DepartmentName'] }} ({{ d['DepartmentEpicId'] }})</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="col-auto">
+        <select id="add-state" class="form-select">
+            <option value="false">Paused</option>
+            <option value="true">On</option>
+        </select>
+    </div>
+    <div class="col-auto">
+        <button type="submit" class="btn btn-primary">Add</button>
+    </div>
+</form>
+
+<script>
+function saveTexting(dept, enabled) {
+    return fetch('/location/' + encodeURIComponent(dept) + '/texting', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({enabled: enabled})
+    }).then(function (r) {
+        return r.json().then(function (j) { if (!r.ok) throw new Error(j.error || r.status); return j; });
+    });
+}
+
+document.querySelectorAll('.texting-toggle').forEach(function (box) {
+    box.addEventListener('change', function () {
+        var enabled = box.checked, name = box.dataset.name;
+        var msg = enabled
+            ? 'Turn ON Switchboard texts for ' + name + '?'
+            : 'PAUSE Switchboard texts for ' + name + '?\n\nPatients with appointments here will stop getting texts starting with the next send-job run.';
+        if (!confirm(msg)) { box.checked = !enabled; return; }
+        box.disabled = true;
+        saveTexting(box.dataset.dept, enabled)
+            .then(function () { box.nextElementSibling.textContent = enabled ? 'On' : 'Paused'; })
+            .catch(function (err) { box.checked = !enabled; alert('Could not save setting: ' + err.message); })
+            .finally(function () { box.disabled = false; });
+    });
+});
+
+document.getElementById('add-form').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var sel = document.getElementById('add-dept'), enabled = document.getElementById('add-state').value === 'true';
+    if (!sel.value) return;
+    var name = sel.options[sel.selectedIndex].text;
+    if (enabled && !confirm('Add ' + name + ' and turn Switchboard texts ON?')) return;
+    saveTexting(sel.value, enabled)
+        .then(function () { window.location.reload(); })
+        .catch(function (err) { alert('Could not add department: ' + err.message); });
+});
+</script>
+
+{% endblock %}

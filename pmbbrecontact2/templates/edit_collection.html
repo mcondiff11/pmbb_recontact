@@ -7,11 +7,15 @@
 <h1 class="py-2"><i class="bi bi-pencil-square"></i> Edit Collection</h1>
 
 <div class="mb-3">
+    {% if row['collection_id'] is not none %}
     <strong>Collection ID:</strong> {{ row['collection_id'] }}<br>
+    {% else %}
+    <strong>Sample ID:</strong> {{ row['sample_id'] }} <span class="text-muted">(imported, no scheduled collection)</span><br>
+    {% endif %}
     <strong>Patient:</strong> {{ row['patient_name'] or row['EMPI'] }}
 </div>
 
-<form method="POST" action="/edit_collection/{{ row['collection_id'] }}" id="edit-form">
+<form method="POST" action="{{ request.path }}" id="edit-form">
 
     <div id="validation-alert" class="alert alert-warning d-none" role="alert"></div>
 

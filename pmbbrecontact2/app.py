@@ -4,8 +4,7 @@ import pandas as pd
 import os
 import math
 from databricks.sdk.core import Config
-from datetime import datetime, date, timedelta
-from zoneinfo import ZoneInfo
+from datetime import datetime
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -202,14 +201,7 @@ def get_locations():
         connection = get_databricks_connection()
         cursor = connection.cursor()
 
-        query = """
-            SELECT d.DepartmentEpicId, d.DepartmentName, d.DepartmentExternalName, d.ParentLocationName, d.PostalCode, d.UnivCity_recontact_location,
-                   COALESCE(s.texting_enabled, TRUE) AS texting_enabled
-            FROM biobank_analytics.pmbb_saliva.departments d
-            LEFT JOIN biobank_analytics.pmbb_saliva.department_texting_settings s
-              ON s.DepartmentEpicId = CAST(d.DepartmentEpicId AS STRING)
-            ORDER BY d.UnivCity_recontact_location DESC
-        """
+        query = "SELECT DepartmentEpicId, DepartmentName,DepartmentExternalName,ParentLocationName,PostalCode,UnivCity_recontact_location from biobank_analytics.pmbb_saliva.departments order by UnivCity_recontact_location desc"
         cursor.execute(query)
 
         # Fetch all results
@@ -218,6 +210,39 @@ def get_locations():
         connection.close()
 
         return render_template('locations.html', rows=rows)
+    except Exception as e:
+        return f"Error: {str(e)}"
+
+@app.route('/switchboard_settings', methods=['GET'])
+def switchboard_settings():
+    """Departments that can receive Switchboard texts, with an on/paused switch for each.
+    Only departments listed here with texting_enabled = TRUE get texts; every other department is off."""
+    try:
+        with get_databricks_connection() as connection:
+            with connection.cursor() as cursor:
+                cursor.execute("""
+                    SELECT s.DepartmentEpicId, s.texting_enabled, s.updated_by, s.updated_at,
+                           d.DepartmentName, d.ParentLocationName
+                    FROM biobank_analytics.pmbb_saliva.department_texting_settings s
+                    LEFT JOIN biobank_analytics.pmbb_saliva.departments d
+                      ON CAST(d.DepartmentEpicId AS STRING) = s.DepartmentEpicId
+                    ORDER BY s.texting_enabled DESC, d.DepartmentName
+                """)
+                rows = [r.asDict() for r in cursor.fetchall()]
+
+                # Departments not on the list yet, for the "Add department" picker
+                cursor.execute("""
+                    SELECT CAST(d.DepartmentEpicId AS STRING) AS DepartmentEpicId, d.DepartmentName
+                    FROM biobank_analytics.pmbb_saliva.departments d
+                    WHERE NOT EXISTS (
+                        SELECT 1 FROM biobank_analytics.pmbb_saliva.department_texting_settings s
+                        WHERE s.DepartmentEpicId = CAST(d.DepartmentEpicId AS STRING)
+                    )
+                    ORDER BY d.DepartmentName
+                """)
+                available = [r.asDict() for r in cursor.fetchall()]
+
+        return render_template('switchboard_settings.html', rows=rows, available=available)
     except Exception as e:
         return f"Error: {str(e)}"
 
@@ -502,7 +527,7 @@ def completed_collections():
             params.append(date_to)
 
         query = f"""
-            SELECT cs.collection_id, cs.EMPI, cs.saliva_kit_id, cs.sharpie, cs.collected_by, cs.location_id, cs.created_date,
+            SELECT cs.sample_id, cs.collection_id, cs.EMPI, cs.saliva_kit_id, cs.sharpie, cs.collected_by, cs.location_id, cs.created_date,
                    sc.patient_name, sc.location_name
             FROM biobank_analytics.pmbb_saliva.collected_sample cs
             LEFT JOIN biobank_analytics.pmbb_saliva.scheduled_collection sc ON cs.collection_id = sc.collection_id
@@ -561,76 +586,6 @@ def upcoming_collections():
     except Exception as e:
         return f"Error: {str(e)}"
     
-@app.route('/switchboard_collections', methods=['GET'])
-def switchboard_collections():
-    """Scheduled collections created from Switchboard "Yes" replies, grouped by department.
-    Defaults to today + the next 2 days; a picked date shows only that day."""
-    try:
-        # Use Philadelphia time so "today" doesn't roll over early on a UTC server
-        today = datetime.now(ZoneInfo("America/New_York")).date()
-
-        selected_date = request.args.get('date', '').strip()
-        dept_id = request.args.get('dept_id', '').strip()
-
-        if selected_date:
-            try:
-                start = date.fromisoformat(selected_date)
-            except ValueError:
-                start, selected_date = today, ''
-            end = start if selected_date else today + timedelta(days=2)
-        else:
-            start, end = today, today + timedelta(days=2)
-
-        conditions = "t1.staff_member = 'switchboard' AND to_date(t1.appointment_date) BETWEEN ? AND ?"
-        params = [start.isoformat(), end.isoformat()]
-        if dept_id:
-            conditions += " AND CAST(t1.DepartmentEpicId AS STRING) = ?"
-            params.append(dept_id)
-
-        # Collections the switchboard results job scheduled (patients who texted back Yes)
-        query = f"""
-            SELECT t1.*, t2.saliva_kit_id
-            FROM biobank_analytics.pmbb_saliva.scheduled_collection t1
-            LEFT JOIN biobank_analytics.pmbb_saliva.collected_sample t2 ON t1.collection_id = t2.collection_id
-            WHERE {conditions}
-            ORDER BY t1.location_name, t1.DepartmentEpicId, t1.appointment_date, t1.appointment_time
-        """
-
-        # Department picker: every department with a switchboard collection from today onward
-        dept_query = """
-            SELECT CAST(DepartmentEpicId AS STRING) AS dept_id, MAX(location_name) AS location_name
-            FROM biobank_analytics.pmbb_saliva.scheduled_collection
-            WHERE staff_member = 'switchboard' AND to_date(appointment_date) >= ?
-            GROUP BY CAST(DepartmentEpicId AS STRING)
-            ORDER BY location_name
-        """
-
-        with get_databricks_connection() as connection:
-            with connection.cursor() as cursor:
-                cursor.execute(query, params)
-                rows = [r.asDict() for r in cursor.fetchall()]
-                cursor.execute(dept_query, [today.isoformat()])
-                departments = [r.asDict() for r in cursor.fetchall()]
-
-        # Group by department, preserving the SQL ordering
-        groups = {}
-        for row in rows:
-            key = str(row['DepartmentEpicId'])
-            groups.setdefault(key, {'dept_id': key, 'name': row['location_name'], 'rows': []})['rows'].append(row)
-
-        return render_template(
-            'switchboard_collections.html',
-            groups=list(groups.values()),
-            total=len(rows),
-            departments=departments,
-            selected_date=selected_date,
-            dept_id=dept_id,
-            start=start,
-            end=end,
-        )
-    except Exception as e:
-        return f"Error: {str(e)}"
-
 @app.route('/missed_collections', methods=['GET'])
 def missed_collections():
     """Upcoming collections that were cancelled or missed (outcome = false)"""
@@ -875,23 +830,27 @@ def communications():
 
 
 @app.route('/edit_collection/<collection_id>', methods=['GET', 'POST'])
-def edit_collection(collection_id):
-    """Edit sharpie and saliva_kit_id on a completed collection"""
+@app.route('/edit_sample/<sample_id>', methods=['GET', 'POST'], endpoint='edit_sample')
+def edit_collection(collection_id=None, sample_id=None):
+    """Edit sharpie and saliva_kit_id on a completed collection.
+    Samples recorded in the app are found by collection_id; imported samples
+    (no scheduled collection, so no collection_id) are found by sample_id."""
+    key_column, key_value = ('collection_id', collection_id) if collection_id is not None else ('sample_id', sample_id)
     try:
         connection = get_databricks_connection()
         cursor = connection.cursor()
 
         if request.method == 'GET':
-            query = """
-                SELECT cs.collection_id, cs.EMPI, cs.saliva_kit_id, cs.sharpie,
+            query = f"""
+                SELECT cs.sample_id, cs.collection_id, cs.EMPI, cs.saliva_kit_id, cs.sharpie,
                        sc.patient_name
                 FROM biobank_analytics.pmbb_saliva.collected_sample cs
                 LEFT JOIN biobank_analytics.pmbb_saliva.scheduled_collection sc
                   ON cs.collection_id = sc.collection_id
-                WHERE cs.collection_id = ?
+                WHERE cs.{key_column} = ?
                 LIMIT 1
             """
-            cursor.execute(query, [collection_id])
+            cursor.execute(query, [key_value])
             row = cursor.fetchone()
             cursor.close()
             connection.close()
@@ -903,8 +862,8 @@ def edit_collection(collection_id):
             saliva_kit_id = int(request.form['saliva_kit_id'])
             sharpie = int(request.form['sharpie'])
             cursor.execute(
-                "UPDATE biobank_analytics.pmbb_saliva.collected_sample SET saliva_kit_id = ?, sharpie = ? WHERE collection_id = ?",
-                [saliva_kit_id, sharpie, collection_id]
+                f"UPDATE biobank_analytics.pmbb_saliva.collected_sample SET saliva_kit_id = ?, sharpie = ? WHERE {key_column} = ?",
+                [saliva_kit_id, sharpie, key_value]
             )
             connection.commit()
             cursor.close()
