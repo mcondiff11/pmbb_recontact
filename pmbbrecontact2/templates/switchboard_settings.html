@@ -6,7 +6,7 @@
 
 <h1>Switchboard Texts</h1>
 <p class="text-muted">
-    Only the departments switched <strong>On</strong> below get Switchboard text messages. Every other department is off.
+    Only the departments switched <strong>On</strong> below get Switchboard text messages.
     Changes take effect at the next run of the send job, which texts patients 4 days before their appointment.
 </p>
 
@@ -49,29 +49,9 @@
     </table>
 </div>
 {% else %}
-<p>No departments are set up for Switchboard texts yet, so no texts are being sent.</p>
+<p>No departments are set up for Switchboard texts yet, so no texts are being sent.
+   Departments are added to <code>department_texting_settings</code> in Databricks.</p>
 {% endif %}
-
-<h5 class="mt-4">Add a department</h5>
-<form id="add-form" class="row g-2 align-items-end">
-    <div class="col-md-6">
-        <select id="add-dept" class="form-select" required>
-            <option value="">Choose a department...</option>
-            {% for d in available %}
-            <option value="{{ d['DepartmentEpicId'] }}">{{ d['DepartmentName'] }} ({{ d['DepartmentEpicId'] }})</option>
-            {% endfor %}
-        </select>
-    </div>
-    <div class="col-auto">
-        <select id="add-state" class="form-select">
-            <option value="false">Paused</option>
-            <option value="true">On</option>
-        </select>
-    </div>
-    <div class="col-auto">
-        <button type="submit" class="btn btn-primary">Add</button>
-    </div>
-</form>
 
 <script>
 function saveTexting(dept, enabled) {
@@ -97,17 +77,6 @@ document.querySelectorAll('.texting-toggle').forEach(function (box) {
             .catch(function (err) { box.checked = !enabled; alert('Could not save setting: ' + err.message); })
             .finally(function () { box.disabled = false; });
     });
-});
-
-document.getElementById('add-form').addEventListener('submit', function (e) {
-    e.preventDefault();
-    var sel = document.getElementById('add-dept'), enabled = document.getElementById('add-state').value === 'true';
-    if (!sel.value) return;
-    var name = sel.options[sel.selectedIndex].text;
-    if (enabled && !confirm('Add ' + name + ' and turn Switchboard texts ON?')) return;
-    saveTexting(sel.value, enabled)
-        .then(function () { window.location.reload(); })
-        .catch(function (err) { alert('Could not add department: ' + err.message); });
 });
 </script>
 

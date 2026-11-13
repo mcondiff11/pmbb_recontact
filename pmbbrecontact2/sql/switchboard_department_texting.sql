@@ -21,6 +21,8 @@ CREATE TABLE IF NOT EXISTS biobank_analytics.pmbb_saliva.department_texting_log 
 );
 
 -- Starting state: 1165 and 212 on, 956 paused.
+-- This table IS the list of Switchboard locations. The app can only switch existing rows
+-- On or Paused; to add a location, insert a row here by hand (see the bottom of this file).
 -- Safe to re-run: existing rows are left as they are (change them in the app instead).
 MERGE INTO biobank_analytics.pmbb_saliva.department_texting_settings t
 USING (
@@ -92,3 +94,12 @@ WHERE u.Switchboard_YN = 'Y'
       WHERE s.DepartmentEpicId = CAST(u.DepartmentEpicId AS STRING)
         AND s.texting_enabled = TRUE
   );
+
+
+-- =====================================================================
+-- 3. ADDING A NEW LOCATION (by hand, when Switchboard expands)
+--    Replace 1234 with the DepartmentEpicId. It starts Paused; switch it On in the app.
+-- =====================================================================
+-- INSERT INTO biobank_analytics.pmbb_saliva.department_texting_settings (DepartmentEpicId, texting_enabled, updated_by, updated_at)
+-- SELECT '1234', FALSE, 'manual', current_timestamp()
+-- WHERE NOT EXISTS (SELECT 1 FROM biobank_analytics.pmbb_saliva.department_texting_settings WHERE DepartmentEpicId = '1234');

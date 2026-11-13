@@ -215,8 +215,9 @@ def get_locations():
 
 @app.route('/switchboard_settings', methods=['GET'])
 def switchboard_settings():
-    """Departments that can receive Switchboard texts, with an on/paused switch for each.
-    Only departments listed here with texting_enabled = TRUE get texts; every other department is off."""
+    """On/paused switch for each department in department_texting_settings.
+    That table is the list of Switchboard locations: rows are added by hand in Databricks,
+    and the app can only switch existing rows On or Paused."""
     try:
         with get_databricks_connection() as connection:
             with connection.cursor() as cursor:
@@ -226,29 +227,19 @@ def switchboard_settings():
                     FROM biobank_analytics.pmbb_saliva.department_texting_settings s
                     LEFT JOIN biobank_analytics.pmbb_saliva.departments d
                       ON CAST(d.DepartmentEpicId AS STRING) = s.DepartmentEpicId
-                    ORDER BY s.texting_enabled DESC, d.DepartmentName
+                    ORDER BY d.DepartmentName
                 """)
                 rows = [r.asDict() for r in cursor.fetchall()]
 
-                # Departments not on the list yet, for the "Add department" picker
-                cursor.execute("""
-                    SELECT CAST(d.DepartmentEpicId AS STRING) AS DepartmentEpicId, d.DepartmentName
-                    FROM biobank_analytics.pmbb_saliva.departments d
-                    WHERE NOT EXISTS (
-                        SELECT 1 FROM biobank_analytics.pmbb_saliva.department_texting_settings s
-                        WHERE s.DepartmentEpicId = CAST(d.DepartmentEpicId AS STRING)
-                    )
-                    ORDER BY d.DepartmentName
-                """)
-                available = [r.asDict() for r in cursor.fetchall()]
-
-        return render_template('switchboard_settings.html', rows=rows, available=available)
+        return render_template('switchboard_settings.html', rows=rows)
     except Exception as e:
         return f"Error: {str(e)}"
 
 @app.route('/location/<location_id>/texting', methods=['POST'])
 def set_department_texting(location_id):
-    """Turn Switchboard text messages on/off for a department (read by the switchboard cron job)"""
+    """Turn Switchboard text messages on/off for a department (read by the switchboard send job).
+    Only updates departments already in department_texting_settings; new departments are
+    added to that table by hand in Databricks, never from the app."""
     try:
         data = request.get_json(silent=True) or {}
         if not isinstance(data.get('enabled'), bool):
@@ -261,16 +252,18 @@ def set_department_texting(location_id):
         with get_databricks_connection() as connection:
             with connection.cursor() as cursor:
                 cursor.execute(
+                    "SELECT 1 FROM biobank_analytics.pmbb_saliva.department_texting_settings WHERE DepartmentEpicId = ? LIMIT 1",
+                    [department_id]
+                )
+                if not cursor.fetchone():
+                    return jsonify({'error': f"Department {department_id} is not set up for Switchboard texts"}), 404
+                cursor.execute(
                     """
-                    MERGE INTO biobank_analytics.pmbb_saliva.department_texting_settings t
-                    USING (SELECT ? AS DepartmentEpicId, ? AS texting_enabled, ? AS updated_by, ? AS updated_at) src
-                      ON t.DepartmentEpicId = src.DepartmentEpicId
-                    WHEN MATCHED THEN UPDATE SET
-                        t.texting_enabled = src.texting_enabled, t.updated_by = src.updated_by, t.updated_at = src.updated_at
-                    WHEN NOT MATCHED THEN INSERT (DepartmentEpicId, texting_enabled, updated_by, updated_at)
-                        VALUES (src.DepartmentEpicId, src.texting_enabled, src.updated_by, src.updated_at)
+                    UPDATE biobank_analytics.pmbb_saliva.department_texting_settings
+                    SET texting_enabled = ?, updated_by = ?, updated_at = ?
+                    WHERE DepartmentEpicId = ?
                     """,
-                    [department_id, enabled, user_email, timestamp]
+                    [enabled, user_email, timestamp, department_id]
                 )
                 cursor.execute(
                     "INSERT INTO biobank_analytics.pmbb_saliva.department_texting_log (DepartmentEpicId, texting_enabled, changed_by, changed_at) VALUES (?, ?, ?, ?)",
