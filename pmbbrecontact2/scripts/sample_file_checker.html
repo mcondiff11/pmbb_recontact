@@ -1,0 +1,345 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sample File Checker</title>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<style>
+  :root {
+    --bg: #f7f7f5; --panel: #ffffff; --text: #1d1d1b; --muted: #6b6b66; --border: #dcdcd6;
+    --err-bg: #fde2e1; --err-text: #9b1c1c; --err-strong: #d64545;
+    --warn-bg: #fff1cc; --warn-text: #7a5300; --warn-strong: #b98200;
+    --ok: #2f7d4f; --row-hover: #f0f0ec; --accent: #2d5fa8;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #161615; --panel: #1f1f1d; --text: #ececea; --muted: #a0a09a; --border: #3a3a36;
+      --err-bg: #4a1f1f; --err-text: #ffb4b4; --err-strong: #e06060;
+      --warn-bg: #46380f; --warn-text: #ffd97a; --warn-strong: #e0b030;
+      --ok: #6fcf97; --row-hover: #2a2a27; --accent: #7aa7e8;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 15px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 1400px; margin: 0 auto; padding: 24px 16px 48px; }
+  h1 { font-size: 1.5rem; margin: 0 0 4px; }
+  .sub { color: var(--muted); margin: 0 0 20px; }
+  .drop { display: block; border: 2px dashed var(--border); border-radius: 10px; background: var(--panel);
+          padding: 28px 16px; text-align: center; cursor: pointer; }
+  .drop.over { border-color: var(--accent); }
+  .drop input { display: none; }
+  .drop strong { color: var(--accent); }
+  .settings { display: flex; flex-wrap: wrap; gap: 16px; margin: 14px 0 0; color: var(--muted); font-size: 0.9rem; }
+  .settings input { width: 4em; padding: 2px 4px; background: var(--panel); color: var(--text);
+                    border: 1px solid var(--border); border-radius: 4px; }
+  .summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin: 22px 0 14px; }
+  .tile { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; }
+  .tile .n { font-size: 1.5rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .tile .l { color: var(--muted); font-size: 0.85rem; }
+  .tile.err .n { color: var(--err-strong); } .tile.warn .n { color: var(--warn-strong); } .tile.ok .n { color: var(--ok); }
+  .issues { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 12px 16px; margin-bottom: 14px; }
+  .issues h2 { font-size: 1rem; margin: 0 0 8px; }
+  .issues ul { margin: 0; padding-left: 18px; }
+  .issues li { margin: 3px 0; }
+  .tag { display: inline-block; font-size: 0.75rem; font-weight: 600; padding: 0 6px; border-radius: 4px; margin-right: 6px; }
+  .tag.err { background: var(--err-bg); color: var(--err-text); }
+  .tag.warn { background: var(--warn-bg); color: var(--warn-text); }
+  .toolbar { display: flex; flex-wrap: wrap; gap: 16px; align-items: center; margin: 0 0 8px; font-size: 0.9rem; }
+  .legend { color: var(--muted); }
+  .table-wrap { overflow: auto; max-height: 75vh; background: var(--panel); border: 1px solid var(--border); border-radius: 8px; }
+  table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
+  th, td { padding: 6px 10px; border-bottom: 1px solid var(--border); text-align: left; white-space: nowrap; }
+  th { position: sticky; top: 0; z-index: 1; background: var(--panel); font-size: 0.8rem; color: var(--muted); }
+  td.line { color: var(--muted); }
+  td.cell-err { background: var(--err-bg); color: var(--err-text); font-weight: 600; }
+  td.cell-warn { background: var(--warn-bg); color: var(--warn-text); font-weight: 600; }
+  td.notes { white-space: normal; font-size: 0.85rem; color: var(--muted); min-width: 260px; }
+  tr:hover td:not(.cell-err):not(.cell-warn) { background: var(--row-hover); }
+  tr.row-err td.line { color: var(--err-strong); font-weight: 600; }
+  tr.row-warn td.line { color: var(--warn-strong); font-weight: 600; }
+  .hidden { display: none; }
+  .dim { opacity: .6; }
+  .error-box { background: var(--err-bg); color: var(--err-text); padding: 10px 14px; border-radius: 8px; margin-top: 14px; }
+  a.jump { color: var(--accent); cursor: pointer; text-decoration: underline; }
+  tr.flash td { outline: 2px solid var(--accent); outline-offset: -2px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Sample File Checker</h1>
+  <p class="sub">Shows the first sheet of a collected-sample Excel file and flags problems before it is inserted into
+    <code>collected_sample</code>. The file is read in this browser only; nothing is uploaded or saved.</p>
+
+  <label class="drop" id="drop">
+    <input type="file" id="file" accept=".xlsx,.xls,.csv">
+    <div><strong>Choose an Excel file</strong> or drop it here</div>
+    <div class="sub" style="margin:6px 0 0" id="fname">Expected columns, in order: empi, Kit #, Tube #, hup_mrn, First_name, Last_name, DOB, Collection Date, Picked up on:</div>
+  </label>
+  <div id="loadError" class="error-box hidden"></div>
+
+  <div class="settings">
+    <label>EMPI digits <input type="number" id="empiLen" value="10" min="1"></label>
+    <label>Kit # digits <input type="number" id="kitLen" value="14" min="1"></label>
+  </div>
+
+  <div id="results" class="hidden">
+    <div class="summary" id="summary"></div>
+    <div class="issues" id="issues"></div>
+    <div class="toolbar">
+      <label><input type="checkbox" id="onlyIssues"> Show only rows with issues</label>
+      <span class="legend"><span class="tag err">Error</span>must fix before inserting
+        &nbsp; <span class="tag warn">Check</span>probably wrong, worth a look</span>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead id="thead"></thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</main>
+
+<script>
+(function () {
+  // Column positions (0-based) in the sheet
+  var COL = { empi: 0, kit: 1, tube: 2, mrn: 3, first: 4, last: 5, dob: 6, collected: 7, pickedUp: 8 };
+  var EXPECTED = ['empi', 'Kit #', 'Tube #', 'hup_mrn', 'First_name', 'Last_name', 'DOB', 'Collection Date', 'Picked up on:'];
+
+  var drop = document.getElementById('drop'), fileInput = document.getElementById('file');
+  var lastSheet = null, lastName = '';
+
+  fileInput.addEventListener('change', function () { if (fileInput.files[0]) readFile(fileInput.files[0]); });
+  ['dragenter', 'dragover'].forEach(function (ev) { drop.addEventListener(ev, function (e) { e.preventDefault(); drop.classList.add('over'); }); });
+  ['dragleave', 'drop'].forEach(function (ev) { drop.addEventListener(ev, function (e) { e.preventDefault(); drop.classList.remove('over'); }); });
+  drop.addEventListener('drop', function (e) { if (e.dataTransfer.files[0]) readFile(e.dataTransfer.files[0]); });
+  document.getElementById('empiLen').addEventListener('change', rerun);
+  document.getElementById('kitLen').addEventListener('change', rerun);
+  document.getElementById('onlyIssues').addEventListener('change', applyFilter);
+
+  function showError(msg) {
+    var box = document.getElementById('loadError');
+    box.textContent = msg; box.classList.toggle('hidden', !msg);
+  }
+
+  function readFile(f) {
+    showError('');
+    if (typeof XLSX === 'undefined') { showError('The Excel reader library did not load (it comes from cdn.jsdelivr.net). Check your internet connection and reload.'); return; }
+    var r = new FileReader();
+    r.onload = function () {
+      try {
+        var wb = XLSX.read(new Uint8Array(r.result), { type: 'array', cellDates: true, cellNF: true });
+        lastSheet = { ws: wb.Sheets[wb.SheetNames[0]], sheetName: wb.SheetNames[0], sheetCount: wb.SheetNames.length };
+        lastName = f.name;
+        rerun();
+      } catch (err) { showError('Could not read this file: ' + err.message); }
+    };
+    r.readAsArrayBuffer(f);
+  }
+  function rerun() { if (lastSheet) check(lastSheet, lastName); }
+
+  // ---- cell helpers ------------------------------------------------------
+  // Each cell -> { shown: text as Excel displays it, raw: underlying value, type }
+  function readCell(ws, r, c) {
+    var cell = ws[XLSX.utils.encode_cell({ r: r, c: c })];
+    if (!cell || cell.v === undefined || cell.v === null || cell.v === '') return { shown: '', raw: '', type: 'blank' };
+    var shown = cell.w !== undefined ? cell.w : String(cell.v);
+    if (cell.v instanceof Date) return { shown: shown, raw: cell.v, type: 'date' };
+    if (cell.t === 'n') return { shown: shown, raw: cell.v, type: 'number' };
+    return { shown: shown, raw: String(cell.v), type: 'text' };
+  }
+  // Digits-only string for an ID cell, or null if it isn't a whole number
+  function idDigits(cell) {
+    if (cell.type === 'number') return Number.isInteger(cell.raw) && cell.raw >= 0 ? String(cell.raw) : null;
+    if (cell.type === 'text') { var t = cell.raw.trim(); return /^\d+$/.test(t) ? t : null; }
+    return null;
+  }
+  // Date for a date cell (real Excel date, or text Excel didn't recognise as one)
+  function asDate(cell) {
+    if (cell.type === 'date') return cell.raw;
+    if (cell.type === 'text') {
+      var t = cell.raw.trim(), m = t.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2}|\d{4})$/) || null, d;
+      if (m) { var y = +m[3]; if (y < 100) y += 2000; d = new Date(y, +m[1] - 1, +m[2]); }
+      else if (/^\d{4}-\d{2}-\d{2}/.test(t)) d = new Date(t.slice(0, 10) + 'T00:00:00');
+      if (d && !isNaN(d)) return d;
+    }
+    return null;
+  }
+  function fmtDate(d) { return (d.getMonth() + 1) + '/' + d.getDate() + '/' + d.getFullYear(); }
+
+  // ---- checks ------------------------------------------------------------
+  function check(sheet, name) {
+    var ws = sheet.ws, empiLen = +document.getElementById('empiLen').value || 10, kitLen = +document.getElementById('kitLen').value || 14;
+    if (!ws || !ws['!ref']) { showError('The first sheet is empty.'); return; }
+    var range = XLSX.utils.decode_range(ws['!ref']);
+    var nCols = Math.max(range.e.c + 1, EXPECTED.length);
+
+    // Header row = first non-blank row, if its first cell isn't a number
+    var r0 = range.s.r, headers = EXPECTED.slice(), headerNote = 'no header row';
+    var firstEmpi = readCell(ws, r0, 0);
+    if (firstEmpi.type === 'text' && !/^\s*\d+\s*$/.test(firstEmpi.raw)) {
+      headers = [];
+      for (var c = 0; c < nCols; c++) headers.push(readCell(ws, r0, c).shown || EXPECTED[c] || ('Column ' + (c + 1)));
+      headerNote = 'header on row ' + (r0 + 1);
+      r0++;
+    }
+
+    var recs = [], blank = 0, today = new Date();
+    for (var r = r0; r <= range.e.r; r++) {
+      var cells = [];
+      for (var c2 = 0; c2 < nCols; c2++) cells.push(readCell(ws, r, c2));
+      if (cells.every(function (x) { return x.type === 'blank'; })) { blank++; continue; }
+      recs.push({ row: r + 1, cells: cells, issues: [], level: [] });
+    }
+
+    function flag(rec, col, level, msg) {
+      rec.issues.push({ level: level, msg: msg });
+      if (col !== null && rec.level[col] !== 'err') rec.level[col] = level;
+    }
+
+    recs.forEach(function (rec) {
+      var x = rec.cells;
+      // IDs: EMPI, Kit #, Tube #
+      [['empi', 'EMPI', empiLen], ['kit', 'Kit #', kitLen], ['tube', 'Tube #', null]].forEach(function (d) {
+        var col = COL[d[0]], cell = x[col], digits = idDigits(cell);
+        rec[d[0]] = digits;
+        if (cell.type === 'blank') return flag(rec, col, 'err', d[1] + ' is blank');
+        if (digits === null) return flag(rec, col, 'err', d[1] + ' is not a whole number');
+        if (cell.type === 'text' && cell.raw !== cell.raw.trim()) flag(rec, col, 'warn', d[1] + ' has extra spaces');
+        if (/e\+/i.test(cell.shown)) flag(rec, col, 'warn', d[1] + ' is displayed in scientific notation (' + cell.shown + '); full value is ' + digits +
+          '. Fine here, but saving as CSV would round it; format the column as Number with 0 decimals first');
+        if (d[2] && digits.length !== d[2]) flag(rec, col, 'warn', d[1] + ' has ' + digits.length + ' digits (expected ' + d[2] + ')' +
+          (digits.length === d[2] - 1 ? '; leading 0 dropped?' : ''));
+      });
+      // HUP MRN
+      var mrn = x[COL.mrn];
+      if (mrn.type === 'blank') flag(rec, COL.mrn, 'warn', 'hup_mrn is blank');
+      else if (idDigits(mrn) === null) flag(rec, COL.mrn, 'warn', 'hup_mrn is not a whole number');
+      rec.mrn = idDigits(mrn);
+      // Names
+      if (x[COL.first].type === 'blank') flag(rec, COL.first, 'warn', 'First_name is blank');
+      if (x[COL.last].type === 'blank') flag(rec, COL.last, 'warn', 'Last_name is blank');
+      // Dates
+      var dob = asDate(x[COL.dob]), col = asDate(x[COL.collected]), pick = asDate(x[COL.pickedUp]);
+      if (x[COL.dob].type === 'blank') flag(rec, COL.dob, 'warn', 'DOB is blank');
+      else if (!dob) flag(rec, COL.dob, 'warn', 'DOB is not a date');
+      else if (dob > today) flag(rec, COL.dob, 'err', 'DOB is in the future');
+      else if (today.getFullYear() - dob.getFullYear() > 110) flag(rec, COL.dob, 'warn', 'DOB is more than 110 years ago');
+      if (x[COL.collected].type === 'blank') flag(rec, COL.collected, 'warn', 'Collection Date is blank');
+      else if (!col) flag(rec, COL.collected, 'warn', 'Collection Date is not a date');
+      else {
+        if (col > today) flag(rec, COL.collected, 'err', 'Collection Date is in the future');
+        if (dob && col < dob) flag(rec, COL.collected, 'err', 'Collection Date (' + fmtDate(col) + ') is before DOB');
+      }
+      if (x[COL.pickedUp].type !== 'blank') {
+        if (!pick) flag(rec, COL.pickedUp, 'warn', '"Picked up on" is not a date');
+        else if (col && pick < col) flag(rec, COL.pickedUp, 'err', '"Picked up on" (' + fmtDate(pick) + ') is before Collection Date (' + fmtDate(col) + ')');
+        else if (pick > today) flag(rec, COL.pickedUp, 'warn', '"Picked up on" is in the future');
+      }
+    });
+
+    // Duplicates
+    function dupes(key, col, level, label) {
+      var map = {};
+      recs.forEach(function (rec) { if (rec[key]) (map[rec[key]] = map[rec[key]] || []).push(rec); });
+      Object.keys(map).forEach(function (v) {
+        if (map[v].length < 2) return;
+        var rows = map[v].map(function (rec) { return rec.row; });
+        map[v].forEach(function (rec) {
+          flag(rec, col, level, 'Same ' + label + ' as row ' + rows.filter(function (n) { return n !== rec.row; }).join(', '));
+        });
+      });
+    }
+    dupes('kit', COL.kit, 'err', 'Kit #');
+    dupes('empi', COL.empi, 'warn', 'EMPI');
+    dupes('tube', COL.tube, 'warn', 'Tube #');
+    dupes('mrn', COL.mrn, 'warn', 'hup_mrn');
+
+    // Same EMPI paired with different MRNs (or vice versa)
+    function mismatch(a, b, colA, labelA, labelB) {
+      var map = {};
+      recs.forEach(function (rec) { if (rec[a] && rec[b]) (map[rec[a]] = map[rec[a]] || {})[rec[b]] = true; });
+      recs.forEach(function (rec) {
+        if (rec[a] && map[rec[a]] && Object.keys(map[rec[a]]).length > 1)
+          flag(rec, colA, 'err', 'This ' + labelA + ' appears with more than one ' + labelB);
+      });
+    }
+    mismatch('empi', 'mrn', COL.empi, 'EMPI', 'hup_mrn');
+    mismatch('mrn', 'empi', COL.mrn, 'hup_mrn', 'EMPI');
+
+    render(recs, headers, nCols, name, sheet, headerNote, blank);
+  }
+
+  // ---- rendering ---------------------------------------------------------
+  function render(recs, headers, nCols, name, sheet, headerNote, blank) {
+    var isErr = function (rec) { return rec.issues.some(function (i) { return i.level === 'err'; }); };
+    var errN = recs.filter(isErr).length, warnN = recs.filter(function (rec) { return rec.issues.length && !isErr(rec); }).length;
+
+    document.getElementById('fname').textContent = name + ': sheet "' + sheet.sheetName + '"' +
+      (sheet.sheetCount > 1 ? ' (first of ' + sheet.sheetCount + ')' : '') + ', ' + recs.length + ' data rows, ' + headerNote +
+      (blank ? ', ' + blank + ' blank row(s) ignored' : '');
+
+    document.getElementById('summary').innerHTML =
+      tile(recs.length, 'Data rows', '') + tile(recs.length - errN - warnN, 'Rows OK', 'ok') +
+      tile(errN, 'Rows with errors', errN ? 'err' : 'ok') + tile(warnN, 'Rows to check', warnN ? 'warn' : 'ok');
+
+    // Group issues by type for the summary list
+    var groups = {};
+    recs.forEach(function (rec) {
+      rec.issues.forEach(function (i) {
+        var label = i.msg.replace(/ as row [\d, ]+/, ' as another row').replace(/has \d+ digits/, 'has the wrong number of digits')
+          .replace(/ \([^)]*\)/g, '').replace(/; full value is .*/, '');
+        var key = (i.level === 'err' ? '0' : '1') + label;
+        (groups[key] = groups[key] || { level: i.level, label: label, rows: [] });
+        if (groups[key].rows.indexOf(rec.row) < 0) groups[key].rows.push(rec.row);
+      });
+    });
+    var keys = Object.keys(groups).sort();
+    document.getElementById('issues').innerHTML = '<h2>' + (keys.length ? 'Potential issues' : 'No issues found') + '</h2>' +
+      (keys.length ? '<ul>' + keys.map(function (k) {
+        var g = groups[k];
+        return '<li><span class="tag ' + g.level + '">' + (g.level === 'err' ? 'Error' : 'Check') + '</span>' + esc(g.label) +
+          ': row ' + g.rows.map(function (n) { return '<a class="jump" data-row="' + n + '">' + n + '</a>'; }).join(', ') + '</li>';
+      }).join('') + '</ul>' : '<p style="margin:0">Nothing to fix.</p>');
+
+    document.getElementById('thead').innerHTML = '<tr><th>Row</th>' +
+      headers.slice(0, nCols).map(function (h) { return '<th>' + esc(h) + '</th>'; }).join('') + '<th>Issues</th></tr>';
+
+    document.getElementById('tbody').innerHTML = recs.map(function (rec) {
+      var lvl = isErr(rec) ? 'err' : (rec.issues.length ? 'warn' : '');
+      return '<tr id="row-' + rec.row + '" class="' + (lvl ? 'row-' + lvl : '') + '" data-issue="' + (lvl ? 1 : 0) + '">' +
+        '<td class="line">' + rec.row + '</td>' +
+        rec.cells.slice(0, nCols).map(function (cell, c) {
+          var l = rec.level[c];
+          return '<td' + (l ? ' class="cell-' + l + '"' : '') + '>' + show(cell) + '</td>';
+        }).join('') +
+        '<td class="notes">' + rec.issues.map(function (i) { return esc(i.msg); }).join('<br>') + '</td></tr>';
+    }).join('');
+
+    document.getElementById('results').classList.remove('hidden');
+    applyFilter();
+  }
+
+  function tile(n, label, cls) { return '<div class="tile ' + cls + '"><div class="n">' + n + '</div><div class="l">' + label + '</div></div>'; }
+  function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+  // Value as Excel displays it; leading/trailing spaces shown as dots
+  function show(cell) {
+    if (cell.type === 'blank') return '<span class="dim">(blank)</span>';
+    return esc(cell.shown).replace(/^ +| +$/g, function (m) { return '·'.repeat(m.length); });
+  }
+  function applyFilter() {
+    var only = document.getElementById('onlyIssues').checked;
+    document.querySelectorAll('#tbody tr').forEach(function (tr) { tr.classList.toggle('hidden', only && tr.getAttribute('data-issue') === '0'); });
+  }
+  document.addEventListener('click', function (e) {
+    var a = e.target.closest('a.jump'); if (!a) return;
+    var tr = document.getElementById('row-' + a.getAttribute('data-row')); if (!tr) return;
+    tr.classList.remove('hidden');
+    tr.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    tr.classList.add('flash'); setTimeout(function () { tr.classList.remove('flash'); }, 1600);
+  });
+})();
+</script>
+</body>
+</html>

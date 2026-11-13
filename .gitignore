@@ -24,3 +24,7 @@ env/
 .idea/
 *.swp
 *.swo
+
+# Data files (may contain patient identifiers) — never commit
+*.csv
+*.xlsx
