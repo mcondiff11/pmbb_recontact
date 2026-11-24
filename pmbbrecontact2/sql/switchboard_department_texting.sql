@@ -43,9 +43,17 @@ WHEN NOT MATCHED THEN INSERT (DepartmentEpicId, texting_enabled, updated_by, upd
 
 -- =====================================================================
 -- 2. SWITCHBOARD SEND JOB (daily): queues appointments 4 days out for texting,
---    only in departments switched On in department_texting_settings.
+--    only in departments switched On in department_texting_settings, and only for
+--    patients without an open collection (outcome NULL) in scheduled_collection.
+--    A previous missed/cancelled collection (outcome FALSE) does not block a text.
+--    Patients who replied No (response = 2) are not texted again for 6 months from
+--    their reply (prepared.switchboard.biobank_responses.responses_updated_at).
 --    Replies are handled by a separate job: see switchboard_results_job.sql.
+--    Run as a SQL task: no %sql line (that only works in a notebook).
 -- =====================================================================
+
+-- "4 days out" = from the Philadelphia date, not the warehouse's UTC date
+SET TIME ZONE 'America/New_York';
 
 INSERT OVERWRITE biobank.switchboard.switchboard_appointments (
     HUP_MRN,
@@ -68,6 +76,20 @@ WHERE u.Switchboard_YN = 'Y'
       FROM biobank_analytics.pmbb_saliva.department_texting_settings s
       WHERE s.DepartmentEpicId = CAST(u.DepartmentEpicId AS STRING)
         AND s.texting_enabled = TRUE
+  )
+  AND NOT EXISTS (   -- patient already has an open collection
+      SELECT 1
+      FROM biobank_analytics.pmbb_saliva.scheduled_collection sc
+      WHERE sc.EMPI = try_cast(u.EMPI AS BIGINT)
+        AND sc.outcome IS NULL
+  )
+  AND NOT EXISTS (   -- patient said No to a Switchboard text in the last 6 months
+      SELECT 1
+      FROM prepared.switchboard.biobank_responses br
+      WHERE try_cast(br.uid AS BIGINT) = try_cast(u.EMPI AS BIGINT)
+        AND br.response = 2
+        -- reply time; if missing, fall back to the appointment it was about
+        AND coalesce(br.responses_updated_at, br.appt_date) >= add_months(current_timestamp(), -6)
   );
 
 INSERT INTO biobank_analytics.pmbb_saliva.switchboard_text_attempts (
@@ -93,6 +115,20 @@ WHERE u.Switchboard_YN = 'Y'
       FROM biobank_analytics.pmbb_saliva.department_texting_settings s
       WHERE s.DepartmentEpicId = CAST(u.DepartmentEpicId AS STRING)
         AND s.texting_enabled = TRUE
+  )
+  AND NOT EXISTS (   -- patient already has an open collection
+      SELECT 1
+      FROM biobank_analytics.pmbb_saliva.scheduled_collection sc
+      WHERE sc.EMPI = try_cast(u.EMPI AS BIGINT)
+        AND sc.outcome IS NULL
+  )
+  AND NOT EXISTS (   -- patient said No to a Switchboard text in the last 6 months
+      SELECT 1
+      FROM prepared.switchboard.biobank_responses br
+      WHERE try_cast(br.uid AS BIGINT) = try_cast(u.EMPI AS BIGINT)
+        AND br.response = 2
+        -- reply time; if missing, fall back to the appointment it was about
+        AND coalesce(br.responses_updated_at, br.appt_date) >= add_months(current_timestamp(), -6)
   );
 
 

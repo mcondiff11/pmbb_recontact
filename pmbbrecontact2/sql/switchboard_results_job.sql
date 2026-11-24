@@ -1,23 +1,19 @@
 -- =====================================================================
--- SWITCHBOARD RESULTS JOB
--- Source: prepared.switchboard.biobank_responses (one row per text sent;
---         uid = EMPI; response 1 = Yes, 2 = No, NULL = no response).
---         A response only ever changes from NULL to 1 or 2 (never 1 <-> 2), so a
---         "Yes" never has to be undone: it is scheduled on the first run that sees it.
--- Only appointments today or later (Philadelphia time) are considered.
---   1. recontact:            one contact_type 9 row per appointment CSN (text sent);
---                            the notes are kept up to date as the response changes.
---   2. scheduled_collection: one row per "Yes" (response = 1), unless that CSN is
---                            already scheduled or the patient already has an open one.
+-- SWITCHBOARD RESULTS JOB (daily)
+-- Source: prepared.switchboard.biobank_responses (one row per text sent, one text
+--         per appointment; uid = EMPI; response 1 = Yes, 2 = No, NULL = no response).
+--         A response only ever changes from NULL to 1 or 2 (never 1 <-> 2).
+--   1. recontact:            one contact_type 9 row per text (CSN), all dates;
+--                            notes 'Yes' / 'No' / 'No response', updated when a
+--                            'No response' row gets a reply.
+--   2. scheduled_collection: one row per "Yes" for appointments today or later, unless
+--                            that CSN is already scheduled or the patient already has
+--                            an open one.
 -- Safe to re-run: nothing is inserted twice.
--- (Sending texts is a separate job: see switchboard_department_texting.sql, part 2.)
+-- Run as a SQL task: no %sql line (that only works in a notebook).
+-- (Sending texts is a separate job: see switchboard_department_texting.sql, part 2.
+--  The first load of past texts into recontact: switchboard_recontact_backfill.sql.)
 -- =====================================================================
-
-
--- ---------------------------------------------------------------------
--- 0. ONE-TIME SETUP: run once before the first run of this job, then leave commented out
--- ---------------------------------------------------------------------
--- ALTER TABLE biobank_analytics.pmbb_saliva.recontact ADD COLUMNS (switchboard_csn STRING);
 
 
 -- "today" = Philadelphia date, not the warehouse's UTC date
@@ -25,32 +21,28 @@ SET TIME ZONE 'America/New_York';
 
 
 -- ---------------------------------------------------------------------
--- 1. recontact: one row per appointment CSN that was texted
---    New CSN       -> insert a row (contact_type 9)
---    Known CSN     -> update the notes if the response changed (e.g. no response -> Yes)
+-- 1. recontact: one row per text sent
+--    New CSN                        -> insert a row (contact_type 9, inserted = now)
+--    Known CSN, 'No response' -> reply -> update notes to 'Yes' / 'No'
+--    (inserted is never changed)
 -- ---------------------------------------------------------------------
 MERGE INTO biobank_analytics.pmbb_saliva.recontact t
 USING (
     SELECT
         csn,
-        CAST(uid AS BIGINT) AS empi_id,
-        concat(
-            'Switchboard text for appointment ', date_format(appt_date, 'yyyy-MM-dd HH:mm'),
-            ' (dept ', dept_id, ') - response: ',
-            CASE response WHEN 1 THEN 'Yes' WHEN 2 THEN 'No' ELSE 'No response' END
-        ) AS notes
+        try_cast(uid AS BIGINT) AS empi_id,
+        CASE response WHEN 1 THEN 'Yes' WHEN 2 THEN 'No' ELSE 'No response' END AS notes
     FROM prepared.switchboard.biobank_responses
-    WHERE to_date(appt_date) >= current_date()
-      AND csn IS NOT NULL
-      AND uid IS NOT NULL
-    -- if a CSN has more than one row, prefer Yes, then No, then no response
+    WHERE csn IS NOT NULL
+      AND try_cast(uid AS BIGINT) IS NOT NULL
+    -- safety net in case a CSN ever appears twice: prefer Yes, then No, then no response
     QUALIFY ROW_NUMBER() OVER (
         PARTITION BY csn
         ORDER BY CASE response WHEN 1 THEN 0 WHEN 2 THEN 1 ELSE 2 END
     ) = 1
 ) s
 ON t.contact_type = 9 AND t.switchboard_csn = s.csn
-WHEN MATCHED AND NOT (t.notes <=> s.notes) THEN UPDATE SET
+WHEN MATCHED AND t.notes = 'No response' AND s.notes <> 'No response' THEN UPDATE SET
     t.notes = s.notes
 WHEN NOT MATCHED THEN INSERT (empi_id, contact_type, inserted, notes, staff_member, switchboard_csn)
     VALUES (s.empi_id, 9, current_timestamp(), s.notes, 'switchboard', s.csn);
@@ -74,15 +66,15 @@ INSERT INTO biobank_analytics.pmbb_saliva.scheduled_collection (
     patient_name
 )
 SELECT
-    u.EncounterEpicCsn,
-    u.EMPI,
-    u.DepartmentEpicId,
-    'switchboard'       AS staff_member,
-    current_timestamp() AS created_at,
-    u.Appointment_Location,
-    u.AppointmentDate,
-    u.AppointemntTime,
-    u.Patient_name
+    try_cast(u.EncounterEpicCsn AS BIGINT) AS appointment_id,
+    try_cast(u.EMPI AS BIGINT)             AS EMPI,
+    try_cast(u.DepartmentEpicId AS INT)    AS DepartmentEpicId,
+    'switchboard'                          AS staff_member,
+    current_timestamp()                    AS created_at,
+    u.Appointment_Location                 AS location_name,
+    to_date(u.AppointmentDate)             AS appointment_date,
+    CAST(u.AppointemntTime AS STRING)      AS appointment_time,
+    u.Patient_name                         AS patient_name
 FROM (
     SELECT DISTINCT csn
     FROM prepared.switchboard.biobank_responses
@@ -91,13 +83,18 @@ FROM (
 ) r
 JOIN biobank_analytics.pmbb_saliva.upcoming_appointments_for_saliva u
   ON CAST(u.EncounterEpicCsn AS STRING) = r.csn
-WHERE NOT EXISTS (   -- this appointment is already scheduled (by this job or by hand)
-          SELECT 1 FROM biobank_analytics.pmbb_saliva.scheduled_collection sc
-          WHERE CAST(sc.appointment_id AS STRING) = r.csn
-      )
-  AND NOT EXISTS (   -- patient already has an open collection (not yet collected or missed)
-          SELECT 1 FROM biobank_analytics.pmbb_saliva.scheduled_collection sc2
-          WHERE sc2.EMPI = u.EMPI AND sc2.outcome IS NULL
-      )
--- one row per patient: if they said Yes for several appointments, take the earliest
+WHERE try_cast(u.EncounterEpicCsn AS BIGINT) IS NOT NULL
+  AND try_cast(u.EMPI AS BIGINT) IS NOT NULL
+  -- this appointment is already scheduled (by this job or by hand in the app)
+  AND NOT EXISTS (
+      SELECT 1 FROM biobank_analytics.pmbb_saliva.scheduled_collection sc
+      WHERE sc.appointment_id = try_cast(u.EncounterEpicCsn AS BIGINT)
+  )
+  -- patient already has an open collection (not yet collected or missed)
+  AND NOT EXISTS (
+      SELECT 1 FROM biobank_analytics.pmbb_saliva.scheduled_collection sc2
+      WHERE sc2.EMPI = try_cast(u.EMPI AS BIGINT)
+        AND sc2.outcome IS NULL
+  )
+-- one row per patient: if they said Yes for more than one appointment, take the earliest
 QUALIFY ROW_NUMBER() OVER (PARTITION BY u.EMPI ORDER BY u.AppointmentInstant) = 1;

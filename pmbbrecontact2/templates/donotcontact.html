@@ -42,7 +42,7 @@
                 <tbody>
                    {% for contact_row in contact_rows %}
                     <tr>
-                        <td>{{ contact_row['contact_type'] }}</td>
+                        <td>{{ contact_row['contact_type'] | contact_type_label }}</td>
                         <td>{{ contact_row['inserted'] }}</td>
                         <td>{{contact_row['notes']}}</td>
                         <td>{{contact_row['staff_member']}}</td>

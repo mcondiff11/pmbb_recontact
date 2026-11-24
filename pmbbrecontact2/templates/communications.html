@@ -42,7 +42,7 @@
             {% for row in rows %}
             <tr>
                 <td><a href="{{ url_for('person_details', person_id=row['empi_id']) }}">{{ row['empi_id'] }}</a></td>
-                <td>{{ row['contact_type'] }}</td>
+                <td>{{ row['contact_type'] | contact_type_label }}</td>
                 <td>{{ row['inserted'] }}</td>
                 <td>{{ row['notes'] }}</td>
                 <td>{{ row['staff_member'] }}</td>

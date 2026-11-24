@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+
+{% block title %}Switchboard Stats{% endblock %}
+
+{% macro pct(n, total) -%}
+    {%- if total %}{{ '%.1f' % (100 * n / total) }}%{% else %}&ndash;{% endif -%}
+{%- endmacro %}
+
+{% macro stat(label, n, total=None, note=None) %}
+<div class="col-6 col-md-3">
+    <div class="card h-100">
+        <div class="card-body">
+            <div class="text-muted small">{{ label }}</div>
+            <div class="fs-3 fw-semibold">{{ '{:,}'.format(n) }}</div>
+            {% if total is not none %}<div class="small text-muted">{{ pct(n, total) }} {{ note }}</div>{% endif %}
+        </div>
+    </div>
+</div>
+{% endmacro %}
+
+{% block content %}
+
+<h1>Switchboard Stats</h1>
+
+<ul class="nav nav-pills my-3">
+    {% for key, p in periods.items() %}
+    <li class="nav-item">
+        <a class="nav-link {% if key == period %}active{% endif %}" href="{{ url_for('switchboard_stats', period=key) }}">{{ p[0] }}</a>
+    </li>
+    {% endfor %}
+</ul>
+
+<h4 class="mt-4">Texts</h4>
+<div class="row g-3">
+    {{ stat('Texts sent', texts['sent']) }}
+    {{ stat('Yes', texts['yes'], texts['sent'], 'of texts') }}
+    {{ stat('No', texts['no'], texts['sent'], 'of texts') }}
+    {{ stat('No response', texts['no_response'], texts['sent'], 'of texts') }}
+</div>
+
+<h4 class="mt-4">Switchboard Collections</h4>
+<div class="row g-3">
+    {{ stat('Scheduled', collections['scheduled']) }}
+    {{ stat('Completed', collections['completed'], collections['scheduled'], 'of scheduled') }}
+    {{ stat('Missed / cancelled', collections['missed'], collections['scheduled'], 'of scheduled') }}
+    {{ stat('Still open', collections['open'], collections['scheduled'], 'of scheduled') }}
+</div>
+
+<h4 class="mt-4">Collections by Location</h4>
+{% if locations %}
+<div class="table-responsive">
+    <table class="table table-striped table-bordered align-middle">
+        <thead class="table-dark">
+            <tr>
+                <th>Location</th>
+                <th class="text-end">Scheduled</th>
+                <th class="text-end">Completed</th>
+                <th class="text-end">Missed / cancelled</th>
+                <th class="text-end">Still open</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in locations %}
+            <tr>
+                <td>{{ row['location_name'] }}</td>
+                <td class="text-end">{{ row['scheduled'] }}</td>
+                <td class="text-end">{{ row['completed'] }} <small class="text-muted">({{ pct(row['completed'], row['scheduled']) }})</small></td>
+                <td class="text-end">{{ row['missed'] }}</td>
+                <td class="text-end">{{ row['open'] }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<p>No Switchboard collections in this period.</p>
+{% endif %}
+
+<p class="text-muted small mt-4">
+    Texts are Switchboard Text contacts in <code>recontact</code>, counted by when the daily job recorded them.
+    Collections are those scheduled by Switchboard (<code>staff_member = 'switchboard'</code>), counted by when they were scheduled.
+    Last Week = past 7 days; Last Month = past month.
+</p>
+
+{% endblock %}

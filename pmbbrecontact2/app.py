@@ -15,6 +15,16 @@ app = Flask(__name__)
 # (DATABRICKS_HOST/CLIENT_ID/CLIENT_SECRET are injected); locally it uses .env or a CLI profile
 cfg = Config()
 
+# recontact.contact_type codes -> display names
+CONTACT_TYPE_LABELS = {1: 'Email', 2: 'Phone', 3: 'Other', 9: 'Switchboard Text'}
+
+@app.template_filter('contact_type_label')
+def contact_type_label(code):
+    try:
+        return CONTACT_TYPE_LABELS.get(int(code), code)
+    except (TypeError, ValueError):
+        return code
+
 # Configuration
 ROWS_PER_PAGE = 100
 
@@ -232,6 +242,66 @@ def switchboard_settings():
                 rows = [r.asDict() for r in cursor.fetchall()]
 
         return render_template('switchboard_settings.html', rows=rows)
+    except Exception as e:
+        return f"Error: {str(e)}"
+
+SWITCHBOARD_STATS_PERIODS = {
+    'all': ('All Time', None),
+    'week': ('Last Week', 'INTERVAL 7 DAYS'),
+    'month': ('Last Month', 'INTERVAL 1 MONTH'),
+}
+
+@app.route('/switchboard_stats', methods=['GET'])
+def switchboard_stats():
+    """Switchboard texting stats: texts sent and their replies (recontact, contact_type 9)
+    and the collections the results job scheduled (scheduled_collection, staff_member 'switchboard').
+    period: all | week | month -- texts by recontact.inserted, collections by created_at."""
+    period = request.args.get('period', 'all')
+    if period not in SWITCHBOARD_STATS_PERIODS:
+        period = 'all'
+    interval = SWITCHBOARD_STATS_PERIODS[period][1]
+    text_since = f"AND inserted >= current_timestamp() - {interval}" if interval else ""
+    coll_since = f"AND created_at >= current_timestamp() - {interval}" if interval else ""
+
+    try:
+        with get_databricks_connection() as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(f"""
+                    SELECT count(*)                         AS sent,
+                           count_if(notes = 'Yes')          AS yes,
+                           count_if(notes = 'No')           AS no,
+                           count_if(notes = 'No response')  AS no_response
+                    FROM biobank_analytics.pmbb_saliva.recontact
+                    WHERE contact_type = 9 {text_since}
+                """)
+                texts = cursor.fetchone().asDict()
+
+                cursor.execute(f"""
+                    SELECT count(*)                         AS scheduled,
+                           count_if(outcome IS NULL)        AS open,
+                           count_if(outcome = TRUE)         AS completed,
+                           count_if(outcome = FALSE)        AS missed
+                    FROM biobank_analytics.pmbb_saliva.scheduled_collection
+                    WHERE staff_member = 'switchboard' {coll_since}
+                """)
+                collections = cursor.fetchone().asDict()
+
+                cursor.execute(f"""
+                    SELECT coalesce(location_name, 'Unknown location') AS location_name,
+                           count(*)                         AS scheduled,
+                           count_if(outcome IS NULL)        AS open,
+                           count_if(outcome = TRUE)         AS completed,
+                           count_if(outcome = FALSE)        AS missed
+                    FROM biobank_analytics.pmbb_saliva.scheduled_collection
+                    WHERE staff_member = 'switchboard' {coll_since}
+                    GROUP BY 1
+                    ORDER BY scheduled DESC, location_name
+                """)
+                locations = [r.asDict() for r in cursor.fetchall()]
+
+        return render_template('switchboard_stats.html', texts=texts, collections=collections,
+                               locations=locations, period=period,
+                               periods=SWITCHBOARD_STATS_PERIODS)
     except Exception as e:
         return f"Error: {str(e)}"
 
